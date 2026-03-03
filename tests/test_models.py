@@ -125,6 +125,22 @@ class TestMatch:
         assert m.end == 5
         assert m.matched_text == "hello"
 
+    def test_negative_start_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            Match(start=-1, end=5, matched_text="bad")
+
+    def test_negative_end_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            Match(start=0, end=-1, matched_text="bad")
+
+    def test_end_before_start_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="end"):
+            Match(start=5, end=3, matched_text="bad")
+
+    def test_zero_length_match_allowed(self) -> None:
+        m = Match(start=3, end=3, matched_text="")
+        assert m.start == m.end
+
 
 class TestViolation:
     def test_violation_defaults(self) -> None:
