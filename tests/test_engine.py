@@ -129,3 +129,57 @@ class TestEvaluator:
         result = evaluator.evaluate("aaa bbb")
         expected = Severity.LOW.weight + Severity.HIGH.weight
         assert result.total_score == expected
+
+    def test_large_input_text(self, pii_policy: PolicyFile) -> None:
+        large_text = "a" * 10_000 + " test@example.com " + "b" * 10_000
+        evaluator = Evaluator(policies=[pii_policy])
+        result = evaluator.evaluate(large_text)
+        assert result.flagged
+        assert any("email" in v.rule_id for v in result.violations)
+
+    def test_concurrent_evaluations(self, pii_policy: PolicyFile) -> None:
+        import concurrent.futures
+
+        evaluator = Evaluator(policies=[pii_policy])
+        texts = [
+            "Contact test@example.com",
+            "Clean text here",
+            "SSN is 123-45-6789",
+            "Another clean text",
+        ]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(evaluator.evaluate, texts))
+
+        assert results[0].flagged  # email
+        assert not results[1].flagged  # clean
+        assert results[2].flagged  # SSN
+        assert not results[3].flagged  # clean
+
+    def test_disabled_semantic_rule_no_api_call(self) -> None:
+        from unittest.mock import MagicMock
+
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="sem-policy", name="Semantic Policy"),
+            rules=[
+                RuleConfig(
+                    id="disabled-semantic",
+                    name="Disabled Semantic",
+                    type=RuleType.SEMANTIC,
+                    severity=Severity.HIGH,
+                    prompt="Analyze this text.",
+                    message="AI violation",
+                    enabled=False,
+                ),
+            ],
+        )
+        mock_client = MagicMock()
+        evaluator = Evaluator(
+            policies=[policy], anthropic_client=mock_client
+        )
+        result = evaluator.evaluate("some text")
+
+        mock_client.messages.create.assert_not_called()
+        assert result.rules_evaluated == 0
