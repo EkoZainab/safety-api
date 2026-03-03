@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+import types
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+TEXT_PREVIEW_LENGTH = 200
 
-class Severity(str, enum.Enum):
+_SEVERITY_WEIGHTS: types.MappingProxyType[str, int] = types.MappingProxyType({
+    "LOW": 1,
+    "MEDIUM": 3,
+    "HIGH": 7,
+    "CRITICAL": 10,
+})
+
+
+class Severity(enum.StrEnum):
     """Severity levels for policy violations, ordered by impact."""
 
     LOW = "LOW"
@@ -20,18 +30,10 @@ class Severity(str, enum.Enum):
     @property
     def weight(self) -> int:
         """Numeric weight used for aggregate scoring."""
-        return _SEVERITY_WEIGHTS[self]
+        return _SEVERITY_WEIGHTS[self.value]
 
 
-_SEVERITY_WEIGHTS: dict[Severity, int] = {
-    Severity.LOW: 1,
-    Severity.MEDIUM: 3,
-    Severity.HIGH: 7,
-    Severity.CRITICAL: 10,
-}
-
-
-class RuleType(str, enum.Enum):
+class RuleType(enum.StrEnum):
     """Supported rule evaluation strategies."""
 
     KEYWORD = "keyword"
@@ -132,9 +134,11 @@ class Violation(BaseModel):
 class EvaluationResult(BaseModel):
     """Complete result of evaluating text against all loaded policies."""
 
-    text_preview: str = Field(description="First 200 chars of input text")
+    text_preview: str = Field(
+        description=f"First {TEXT_PREVIEW_LENGTH} chars of input text"
+    )
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.now(UTC)
     )
     policies_evaluated: int
     rules_evaluated: int
