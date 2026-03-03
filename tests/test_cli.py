@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from safety_api.cli import main
@@ -118,3 +119,26 @@ class TestCLI:
             ],
         )
         assert result.exit_code == 0
+
+    def test_empty_text_shows_error(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["--text", ""])
+        assert result.exit_code != 0
+
+    def test_use_ai_without_api_key(
+        self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--use-ai",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "ANTHROPIC_API_KEY" in result.output
