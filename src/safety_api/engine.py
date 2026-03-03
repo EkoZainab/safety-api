@@ -9,6 +9,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from safety_api.loader import load_policies
 from safety_api.models import (
+    DEFAULT_AI_MODEL,
     TEXT_PREVIEW_LENGTH,
     EvaluationResult,
     PolicyFile,
@@ -44,7 +45,7 @@ class Evaluator:
         self,
         policies: list[PolicyFile],
         anthropic_client: AnthropicClientProtocol | Any | None = None,
-        ai_model: str = "claude-sonnet-4-20250514",
+        ai_model: str = DEFAULT_AI_MODEL,
         severity_threshold: Severity | None = None,
     ) -> None:
         self._policies = policies

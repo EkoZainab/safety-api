@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
-from safety_api.models import Match, Severity, Violation
+from safety_api.models import DEFAULT_AI_MODEL, Match, Severity, Violation
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class _HolisticResponse(BaseModel):
 def evaluate_with_ai(
     text: str,
     client: Any,
-    model: str = "claude-sonnet-4-20250514",
+    model: str = DEFAULT_AI_MODEL,
 ) -> list[Violation]:
     """Run a holistic AI evaluation across all policy categories.
 

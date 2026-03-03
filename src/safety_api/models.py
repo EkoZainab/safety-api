@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 TEXT_PREVIEW_LENGTH = 200
+DEFAULT_AI_MODEL = "claude-sonnet-4-20250514"
 
 _SEVERITY_WEIGHTS: types.MappingProxyType[str, int] = types.MappingProxyType({
     "LOW": 1,

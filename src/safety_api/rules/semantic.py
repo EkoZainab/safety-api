@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
-from safety_api.models import Match, RuleConfig
+from safety_api.models import DEFAULT_AI_MODEL, Match, RuleConfig
 from safety_api.rules.base import BaseRule
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class SemanticRule(BaseRule):
         self,
         config: RuleConfig,
         anthropic_client: Any | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = DEFAULT_AI_MODEL,
     ) -> None:
         super().__init__(config)
         self._client = anthropic_client
