@@ -1,0 +1,49 @@
+policy:
+  id: pii-detection
+  name: PII Detection
+  description: >
+    Detects personally identifiable information in text including
+    email addresses, phone numbers, and government-issued identifiers.
+  version: "1.0.0"
+  enabled: true
+
+rules:
+  - id: pii-email
+    name: Email Address Detection
+    description: Detects email addresses in text
+    type: regex
+    severity: HIGH
+    pattern: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+    message: Email address detected in text
+    enabled: true
+    tags: [pii, contact-info]
+
+  - id: pii-ssn
+    name: SSN Detection
+    description: Detects US Social Security Numbers in XXX-XX-XXXX format
+    type: regex
+    severity: CRITICAL
+    pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    message: Possible Social Security Number detected
+    enabled: true
+    tags: [pii, government-id]
+
+  - id: pii-phone
+    name: Phone Number Detection
+    description: Detects US phone numbers in common formats
+    type: regex
+    severity: HIGH
+    pattern: "\\b(?:\\+1[\\- ]?)?\\(?\\d{3}\\)?[\\- .]?\\d{3}[\\- .]?\\d{4}\\b"
+    message: Phone number detected in text
+    enabled: true
+    tags: [pii, contact-info]
+
+  - id: pii-credit-card
+    name: Credit Card Number Detection
+    description: Detects common credit card number patterns
+    type: regex
+    severity: CRITICAL
+    pattern: "\\b(?:\\d[ -]*?){13,19}\\b"
+    message: Possible credit card number detected
+    enabled: true
+    tags: [pii, financial]

@@ -1,0 +1,71 @@
+policy:
+  id: prompt-injection
+  name: Prompt Injection Detection
+  description: >
+    Detects prompt injection and jailbreak attempts targeting
+    LLM-based systems, including instruction overrides, role
+    assumption, and system prompt extraction.
+  version: "1.0.0"
+  enabled: true
+
+rules:
+  - id: pi-ignore-instructions
+    name: Instruction Override Attempt
+    description: Detects attempts to override or ignore system instructions
+    type: regex
+    severity: CRITICAL
+    pattern: "(?i)(ignore|disregard|forget|override|bypass|skip)\\s+(all\\s+)?(previous|prior|above|earlier|existing|your|system|safety)\\s+(instructions|rules|guidelines|programming|directives|constraints|policies|restrictions)"
+    message: "Prompt injection attempt: instruction override detected"
+    enabled: true
+    tags: [prompt-injection, instruction-override]
+
+  - id: pi-role-assumption
+    name: Role Assumption
+    description: Detects attempts to make the model assume a different identity
+    type: keyword
+    severity: HIGH
+    keywords:
+      - "you are now"
+      - "act as if"
+      - "pretend you are"
+      - "DAN mode"
+      - "developer mode"
+      - "jailbreak"
+      - "do anything now"
+      - "roleplay as"
+      - "simulate being"
+    case_sensitive: false
+    match_whole_word: false
+    message: "Prompt injection attempt: role assumption detected"
+    enabled: true
+    tags: [prompt-injection, role-assumption]
+
+  - id: pi-system-prompt-leak
+    name: System Prompt Extraction
+    description: Detects attempts to extract system prompts or instructions
+    type: keyword
+    severity: CRITICAL
+    keywords:
+      - "repeat your system prompt"
+      - "show me your instructions"
+      - "what are your rules"
+      - "reveal your prompt"
+      - "output your initial"
+      - "print your instructions"
+      - "display your system"
+      - "what were you told"
+    case_sensitive: false
+    match_whole_word: false
+    message: "Prompt injection attempt: system prompt extraction"
+    enabled: true
+    tags: [prompt-injection, data-exfiltration]
+
+  - id: pi-encoding-evasion
+    name: Encoding-Based Evasion
+    description: Detects attempts to use encoding tricks to bypass filters
+    type: regex
+    severity: HIGH
+    pattern: "(?i)(base64|rot13|hex|unicode|encode|decode|\\\\x[0-9a-f]{2}|&#\\d+;|%[0-9a-f]{2})"
+    message: "Possible encoding-based filter evasion attempt"
+    enabled: true
+    tags: [prompt-injection, evasion]

@@ -1,0 +1,60 @@
+policy:
+  id: hate-speech
+  name: Hate Speech Detection
+  description: >
+    Detects hate speech patterns including dehumanizing language,
+    calls for violence against groups, and supremacist rhetoric.
+  version: "1.0.0"
+  enabled: true
+
+rules:
+  - id: hate-dehumanization
+    name: Dehumanizing Language
+    description: Detects patterns that dehumanize groups of people
+    type: regex
+    severity: CRITICAL
+    pattern: "(?i)\\b(those|these|the|all)\\s+\\w+\\s+(are|is)\\s+(animals|vermin|parasites|subhuman|cockroaches|savages|filth|scum|plague|infestation)"
+    message: Dehumanizing language pattern detected
+    enabled: true
+    tags: [hate-speech, dehumanization]
+
+  - id: hate-supremacy
+    name: Supremacist Rhetoric
+    description: Detects supremacist language patterns
+    type: keyword
+    severity: CRITICAL
+    keywords:
+      - "master race"
+      - "racial purity"
+      - "ethnic cleansing"
+      - "white power"
+      - "race war"
+    case_sensitive: false
+    match_whole_word: true
+    message: Supremacist rhetoric detected
+    enabled: true
+    tags: [hate-speech, supremacy]
+
+  - id: hate-group-violence
+    name: Calls for Group Violence
+    description: Detects calls for violence against specific groups
+    type: regex
+    severity: CRITICAL
+    pattern: "(?i)\\b(kill|eliminate|eradicate|exterminate|purge|cleanse|remove|get rid of)\\s+(all|every|the)\\s+\\w+"
+    message: Potential call for violence against a group detected
+    enabled: true
+    tags: [hate-speech, violence, group-targeting]
+
+  - id: hate-semantic
+    name: Semantic Hate Speech Analysis
+    description: Uses AI to detect subtle hate speech including coded language and dog whistles
+    type: semantic
+    severity: HIGH
+    prompt: >
+      Analyze the following text for hate speech, including dog whistles,
+      coded language, and implicit bias against protected groups.
+      Consider context carefully — distinguish between discussion of
+      hate speech and actual hate speech.
+    message: AI-detected potential hate speech
+    enabled: false
+    tags: [hate-speech, ai-evaluation]

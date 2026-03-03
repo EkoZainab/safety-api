@@ -1,0 +1,63 @@
+policy:
+  id: violence-threats
+  name: Violence and Threats Detection
+  description: >
+    Detects violent content, direct threats, and references to
+    weapons in threatening contexts.
+  version: "1.0.0"
+  enabled: true
+
+rules:
+  - id: vt-direct-threat
+    name: Direct Threat of Violence
+    description: Detects direct threats of physical violence against individuals
+    type: regex
+    severity: CRITICAL
+    pattern: "(?i)\\b(i('ll| will| am going to)|we('ll| will| are going to))\\s+(kill|murder|shoot|stab|hurt|harm|attack|destroy|eliminate|beat up|assault)\\s+(you|them|him|her|everyone|anybody|someone)"
+    message: Direct threat of violence detected
+    enabled: true
+    tags: [violence, threats, direct]
+
+  - id: vt-weapon-threat
+    name: Weapon in Threatening Context
+    description: Detects mentions of weapons paired with threatening language
+    type: regex
+    severity: HIGH
+    pattern: "(?i)\\b(bring|get|use|grab|find|got)\\s+(a|my|the|this)\\s+(gun|knife|weapon|bomb|explosive|rifle|pistol|machete)"
+    message: Weapon mention in potentially threatening context
+    enabled: true
+    tags: [violence, weapons]
+
+  - id: vt-self-harm
+    name: Self-Harm Content
+    description: Detects content related to self-harm
+    type: keyword
+    severity: CRITICAL
+    keywords:
+      - "kill myself"
+      - "end my life"
+      - "want to die"
+      - "suicide method"
+      - "how to hang"
+    case_sensitive: false
+    match_whole_word: false
+    message: Self-harm related content detected
+    enabled: true
+    tags: [violence, self-harm]
+
+  - id: vt-mass-violence
+    name: Mass Violence Planning
+    description: Detects language suggestive of planning mass violence
+    type: keyword
+    severity: CRITICAL
+    keywords:
+      - "shoot up"
+      - "bomb threat"
+      - "mass shooting"
+      - "plant a bomb"
+      - "blow up the"
+    case_sensitive: false
+    match_whole_word: false
+    message: Content suggestive of mass violence detected
+    enabled: true
+    tags: [violence, mass-violence, planning]
