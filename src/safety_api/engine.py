@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from safety_api.loader import load_policies
 from safety_api.models import (
+    TEXT_PREVIEW_LENGTH,
     EvaluationResult,
     PolicyFile,
     Severity,
@@ -18,6 +19,18 @@ from safety_api.rules import create_rule
 from safety_api.rules.base import BaseRule
 
 logger = logging.getLogger(__name__)
+
+
+class _MessagesAPI(Protocol):
+    def create(self, **kwargs: Any) -> Any: ...
+
+
+@runtime_checkable
+class AnthropicClientProtocol(Protocol):
+    """Structural type for the Anthropic API client."""
+
+    @property
+    def messages(self) -> _MessagesAPI: ...
 
 
 class Evaluator:
@@ -30,7 +43,7 @@ class Evaluator:
     def __init__(
         self,
         policies: list[PolicyFile],
-        anthropic_client: Any | None = None,
+        anthropic_client: AnthropicClientProtocol | Any | None = None,
         ai_model: str = "claude-sonnet-4-20250514",
         severity_threshold: Severity | None = None,
     ) -> None:
@@ -110,7 +123,7 @@ class Evaluator:
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         result = EvaluationResult(
-            text_preview=text[:200],
+            text_preview=text[:TEXT_PREVIEW_LENGTH],
             policies_evaluated=len(self._policies),
             rules_evaluated=rules_evaluated,
             violations=violations,
