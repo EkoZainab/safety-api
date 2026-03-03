@@ -11,6 +11,8 @@ import json
 import logging
 from typing import Any
 
+from pydantic import BaseModel, Field, ValidationError
+
 from safety_api.models import Match, Severity, Violation
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,30 @@ offsets in the original text.
 """
 
 
+class _SpanResponse(BaseModel):
+    """Validated span from holistic AI response."""
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    text: str = ""
+
+
+class _ViolationResponse(BaseModel):
+    """Validated single violation from holistic AI response."""
+
+    category: str = "unknown"
+    severity: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.8)
+    explanation: str = "AI-detected violation"
+    spans: list[_SpanResponse] = Field(default_factory=list)
+
+
+class _HolisticResponse(BaseModel):
+    """Validated top-level response from holistic AI evaluation."""
+
+    violations: list[_ViolationResponse] = Field(default_factory=list)
+
+
 def evaluate_with_ai(
     text: str,
     client: Any,
@@ -71,40 +97,53 @@ def evaluate_with_ai(
             max_tokens=2048,
             system=_SYSTEM_PROMPT,
             messages=[
-                {"role": "user", "content": f"Evaluate this text:\n\n{text}"}
+                {
+                    "role": "user",
+                    "content": (
+                        "Evaluate this text:\n\n"
+                        f"<text_to_evaluate>\n{text}\n</text_to_evaluate>"
+                    ),
+                }
             ],
         )
         content = response.content[0].text
-        data = json.loads(content)
+        data = _HolisticResponse.model_validate(json.loads(content))
 
+        text_len = len(text)
         violations: list[Violation] = []
-        for v in data.get("violations", []):
-            matches = [
-                Match(
-                    start=s["start"],
-                    end=s["end"],
-                    matched_text=s.get("text", ""),
-                )
-                for s in v.get("spans", [])
-            ]
+        for v in data.violations:
+            matches: list[Match] = []
+            for s in v.spans:
+                clamped_start = min(s.start, text_len)
+                clamped_end = min(s.end, text_len)
+                if clamped_start >= clamped_end:
+                    continue
+                matches.append(Match(
+                    start=clamped_start,
+                    end=clamped_end,
+                    matched_text=s.text or text[clamped_start:clamped_end],
+                ))
 
-            category = v.get("category", "unknown")
+            category = v.category
             violations.append(
                 Violation(
                     rule_id=f"ai-{category.lower().replace(' ', '-')}",
                     rule_name=f"AI: {category}",
                     policy_id="ai-holistic",
                     policy_name="AI Holistic Evaluation",
-                    severity=Severity(v["severity"]),
-                    message=v.get("explanation", "AI-detected violation"),
+                    severity=Severity(v.severity),
+                    message=v.explanation,
                     matches=matches,
                     source="ai",
-                    confidence=v.get("confidence", 0.8),
+                    confidence=v.confidence,
                 )
             )
 
         return violations
 
+    except (ValidationError, json.JSONDecodeError) as e:
+        logger.warning("Invalid AI evaluation response: %s", e)
+        return []
     except Exception:
         logger.exception("Holistic AI evaluation failed")
         return []
