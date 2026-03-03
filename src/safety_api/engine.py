@@ -159,7 +159,6 @@ class Evaluator:
                 }
                 for future in concurrent.futures.as_completed(futures):
                     policy_file, rule = futures[future]
-                    rules_evaluated += 1
                     try:
                         matches = future.result()
                     except Exception as exc:
