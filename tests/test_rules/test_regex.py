@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from safety_api.models import RuleConfig, RuleType, Severity
 from safety_api.rules.regex import RegexRule
 
@@ -73,3 +75,28 @@ class TestRegexRule:
 
         matches = rule.evaluate("This is fine")
         assert matches == []
+
+    def test_invalid_pattern_raises(self) -> None:
+        config = RuleConfig(
+            id="bad-regex",
+            name="Bad Regex",
+            type=RuleType.REGEX,
+            severity=Severity.LOW,
+            pattern=r"(?P<bad",
+            message="broken",
+        )
+        with pytest.raises(ValueError, match="invalid pattern"):
+            RegexRule(config)
+
+    def test_empty_pattern_raises(self) -> None:
+        config = RuleConfig(
+            id="empty-regex",
+            name="Empty Regex",
+            type=RuleType.REGEX,
+            severity=Severity.LOW,
+            pattern="valid",  # bypass Pydantic validator
+            message="empty",
+        )
+        config.pattern = ""  # set empty after construction
+        with pytest.raises(ValueError, match="non-empty pattern"):
+            RegexRule(config)
