@@ -178,6 +178,14 @@ class Evaluator:
         result.compute_score()
         return result
 
+    def summarize_rules(self) -> dict[str, int]:
+        """Return a count of rule instances by type (for dry-run)."""
+        counts: dict[str, int] = {}
+        for _, rule in self._rule_instances:
+            key = rule.config.type.value
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
     @classmethod
     def from_policy_dir(
         cls,

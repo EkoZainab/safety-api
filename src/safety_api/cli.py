@@ -12,7 +12,7 @@ import click
 from safety_api.engine import Evaluator
 from safety_api.formatters.json_fmt import format_json
 from safety_api.formatters.text import format_text
-from safety_api.models import Severity
+from safety_api.models import DEFAULT_AI_MODEL, Severity
 
 # Default policy directory is the policies/ dir at the project root
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent.parent.parent / "policies"
@@ -51,15 +51,15 @@ def _get_anthropic_client() -> Any:
         import anthropic
 
         return anthropic.Anthropic()
-    except ImportError:
+    except ImportError as err:
         raise click.UsageError(
             "The 'anthropic' package is required for --use-ai. "
             "Install with: pip3 install 'safety-api[ai]'"
-        )
+        ) from err
     except Exception as exc:
         raise click.UsageError(
             f"Failed to initialize Anthropic client: {exc}"
-        )
+        ) from exc
 
 
 @click.command()
@@ -118,8 +118,14 @@ def _get_anthropic_client() -> Any:
 @click.option(
     "--ai-model",
     type=str,
-    default="claude-sonnet-4-20250514",
+    default=DEFAULT_AI_MODEL,
     help="Model to use for AI evaluation.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Show loaded rules and exit without evaluating.",
 )
 @click.option(
     "--verbose",
@@ -138,6 +144,7 @@ def main(
     severity_threshold: str | None,
     use_ai: bool,
     ai_model: str,
+    dry_run: bool,
     verbose: bool,
 ) -> None:
     """Evaluate text against configurable content safety policies.
@@ -150,13 +157,6 @@ def main(
         level=logging.DEBUG if verbose else logging.WARNING,
         format="%(levelname)s: %(message)s",
     )
-
-    # Resolve input text
-    input_text = _resolve_input(text, input_file, use_stdin)
-    if not input_text:
-        raise click.UsageError(
-            "Provide text via --text, --file, or --stdin."
-        )
 
     # Resolve policy directory
     resolved_policy_dir = policy_dir or DEFAULT_POLICY_DIR
@@ -176,6 +176,22 @@ def main(
         ai_model=ai_model,
         severity_threshold=severity,
     )
+
+    if dry_run:
+        summary = evaluator.summarize_rules()
+        total = sum(summary.values())
+        click.echo(f"Loaded {total} rules from {resolved_policy_dir}:")
+        for rule_type, count in sorted(summary.items()):
+            label = "  (API call)" if rule_type == "semantic" else ""
+            click.echo(f"  {rule_type}: {count}{label}")
+        return
+
+    # Resolve input text
+    input_text = _resolve_input(text, input_file, use_stdin)
+    if not input_text:
+        raise click.UsageError(
+            "Provide text via --text, --file, or --stdin."
+        )
 
     result = evaluator.evaluate(input_text)
 
