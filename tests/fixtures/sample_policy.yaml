@@ -1,0 +1,14 @@
+policy:
+  id: sample-policy
+  name: Sample Policy
+  enabled: true
+
+rules:
+  - id: sample-email
+    name: Email Detection
+    type: regex
+    severity: HIGH
+    pattern: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+    message: Email address detected
+    enabled: true
+    tags: [pii]

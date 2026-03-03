@@ -1,0 +1,9 @@
+# This file is intentionally invalid — missing required fields
+policy:
+  id: broken
+  name: Broken Policy
+
+rules:
+  - id: broken-rule
+    # Missing 'type', 'severity', and 'message' fields
+    name: Broken Rule
