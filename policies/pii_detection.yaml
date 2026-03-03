@@ -13,7 +13,7 @@ rules:
     description: Detects email addresses in text
     type: regex
     severity: HIGH
-    pattern: "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+    pattern: "[a-zA-Z0-9][a-zA-Z0-9._%+\\-]*@[a-zA-Z0-9][a-zA-Z0-9.\\-]*\\.[a-zA-Z]{2,}"
     message: Email address detected in text
     enabled: true
     tags: [pii, contact-info]
@@ -43,7 +43,7 @@ rules:
     description: Detects common credit card number patterns
     type: regex
     severity: CRITICAL
-    pattern: "\\b(?:\\d[ -]*?){13,19}\\b"
+    pattern: "\\b(?:\\d{4}[- ]?){3}\\d{1,4}\\b"
     message: Possible credit card number detected
     enabled: true
     tags: [pii, financial]
