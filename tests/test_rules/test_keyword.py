@@ -142,3 +142,34 @@ class TestKeywordRule:
         config.keywords = None  # bypass validator
         with pytest.raises(ValueError, match="requires"):
             KeywordRule(config)
+
+    def test_non_ascii_whole_word(self) -> None:
+        config = RuleConfig(
+            id="non-ascii",
+            name="Non-ASCII",
+            type=RuleType.KEYWORD,
+            severity=Severity.LOW,
+            keywords=["café"],
+            case_sensitive=False,
+            match_whole_word=True,
+            message="matched",
+        )
+        rule = KeywordRule(config)
+
+        # Should match as a whole word with accented characters
+        assert len(rule.evaluate("visit the café today")) == 1
+        assert len(rule.evaluate("no match here")) == 0
+
+    def test_cjk_substring_matching(self) -> None:
+        config = RuleConfig(
+            id="cjk",
+            name="CJK",
+            type=RuleType.KEYWORD,
+            severity=Severity.LOW,
+            keywords=["危険"],
+            case_sensitive=False,
+            match_whole_word=False,
+            message="matched",
+        )
+        rule = KeywordRule(config)
+        assert len(rule.evaluate("これは危険です")) == 1
