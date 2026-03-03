@@ -26,19 +26,19 @@ The evaluator uses a **factory pattern** for rules — adding a new rule type re
 ## Installation
 
 ```bash
-pip install -e .
+pip3 install -e .
 ```
 
 With AI evaluation support:
 
 ```bash
-pip install -e ".[ai]"
+pip3 install -e ".[ai]"
 ```
 
 With development tools (pytest, ruff, mypy):
 
 ```bash
-pip install -e ".[dev]"
+pip3 install -e ".[dev]"
 ```
 
 ## Usage
