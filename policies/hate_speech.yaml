@@ -56,5 +56,5 @@ rules:
       Consider context carefully — distinguish between discussion of
       hate speech and actual hate speech.
     message: AI-detected potential hate speech
-    enabled: false
+    enabled: true
     tags: [hate-speech, ai-evaluation]
