@@ -67,5 +67,11 @@ def format_text(result: EvaluationResult) -> str:
     else:
         lines.append("RESULT: CLEAN  |  No violations detected")
 
+    if result.warnings:
+        lines.append(_THIN_SEP)
+        lines.append(f"Warnings ({len(result.warnings)}):")
+        for warning in result.warnings:
+            lines.append(f"  - {warning}")
+
     lines.append(f"\n{_SEPARATOR}")
     return "\n".join(lines)

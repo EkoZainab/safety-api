@@ -56,6 +56,7 @@ class Evaluator:
         self._anthropic_client = anthropic_client
         self._ai_model = ai_model
         self._severity_threshold = severity_threshold
+        self._build_warnings: list[str] = []
         self._rule_instances = self._build_rules()
 
     def _build_rules(self) -> list[tuple[PolicyFile, BaseRule]]:
@@ -75,9 +76,12 @@ class Evaluator:
                 try:
                     rule = create_rule(rule_config, **kwargs)
                     instances.append((policy_file, rule))
-                except Exception:
+                except Exception as exc:
                     logger.exception(
                         "Failed to create rule '%s'", rule_config.id
+                    )
+                    self._build_warnings.append(
+                        f"Rule '{rule_config.id}' skipped: {exc}"
                     )
 
         return instances
@@ -116,6 +120,7 @@ class Evaluator:
         """
         start = time.perf_counter()
         violations: list[Violation] = []
+        eval_warnings: list[str] = list(self._build_warnings)
         rules_evaluated = 0
 
         deterministic: list[tuple[PolicyFile, BaseRule]] = []
@@ -129,7 +134,16 @@ class Evaluator:
 
         # Evaluate deterministic rules synchronously (fast)
         for policy_file, rule in deterministic:
-            matches = rule.evaluate(text)
+            try:
+                matches = rule.evaluate(text)
+            except Exception as exc:
+                logger.exception(
+                    "Rule '%s' failed during evaluation", rule.config.id
+                )
+                eval_warnings.append(
+                    f"Rule '{rule.config.id}' failed: {exc}"
+                )
+                continue
             rules_evaluated += 1
             if matches:
                 violations.append(self._make_violation(policy_file, rule, matches))
@@ -147,10 +161,13 @@ class Evaluator:
                     rules_evaluated += 1
                     try:
                         matches = future.result()
-                    except Exception:
+                    except Exception as exc:
                         logger.exception(
                             "Rule '%s' failed during evaluation",
                             rule.config.id,
+                        )
+                        eval_warnings.append(
+                            f"Rule '{rule.config.id}' failed: {exc}"
                         )
                         continue
                     if matches:
@@ -174,6 +191,7 @@ class Evaluator:
             rules_evaluated=rules_evaluated,
             violations=violations,
             evaluation_time_ms=round(elapsed_ms, 2),
+            warnings=eval_warnings,
         )
         result.compute_score()
         return result

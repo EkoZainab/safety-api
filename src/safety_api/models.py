@@ -148,6 +148,7 @@ class EvaluationResult(BaseModel):
     max_severity: Severity | None = None
     flagged: bool = False
     evaluation_time_ms: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
