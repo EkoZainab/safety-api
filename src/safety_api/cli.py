@@ -34,7 +34,19 @@ def _resolve_input(
 
 
 def _get_anthropic_client() -> Any:
-    """Lazily import and initialize the Anthropic client."""
+    """Lazily import and initialize the Anthropic client.
+
+    Validates that the API key is present before constructing the
+    client so failures surface immediately rather than mid-evaluation.
+    """
+    import os
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise click.UsageError(
+            "ANTHROPIC_API_KEY environment variable is required for --use-ai. "
+            "Set it with: export ANTHROPIC_API_KEY=your-key-here"
+        )
+
     try:
         import anthropic
 
@@ -42,12 +54,11 @@ def _get_anthropic_client() -> Any:
     except ImportError:
         raise click.UsageError(
             "The 'anthropic' package is required for --use-ai. "
-            "Install with: pip install 'safety-api[ai]'"
+            "Install with: pip3 install 'safety-api[ai]'"
         )
     except Exception as exc:
         raise click.UsageError(
-            f"Failed to initialize Anthropic client: {exc}. "
-            "Ensure ANTHROPIC_API_KEY is set in your environment."
+            f"Failed to initialize Anthropic client: {exc}"
         )
 
 
