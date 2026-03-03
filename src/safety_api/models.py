@@ -101,9 +101,17 @@ class PolicyFile(BaseModel):
 class Match(BaseModel):
     """A single match location within the evaluated text."""
 
-    start: int
-    end: int
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
     matched_text: str
+
+    @field_validator("end")
+    @classmethod
+    def end_not_before_start(cls, v: int, info: Any) -> int:
+        start = info.data.get("start", 0)
+        if v < start:
+            raise ValueError(f"end ({v}) must be >= start ({start})")
+        return v
 
 
 class Violation(BaseModel):
