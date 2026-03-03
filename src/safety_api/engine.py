@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from safety_api.anthropic_eval import evaluate_with_ai
 from safety_api.loader import load_policies
 from safety_api.models import (
     DEFAULT_AI_MODEL,
@@ -170,10 +171,22 @@ class Evaluator:
                             f"Rule '{rule.config.id}' failed: {exc}"
                         )
                         continue
+                    rules_evaluated += 1
                     if matches:
                         violations.append(
                             self._make_violation(policy_file, rule, matches)
                         )
+
+        # Run holistic AI evaluation if client is available
+        if self._anthropic_client is not None:
+            try:
+                ai_violations = evaluate_with_ai(
+                    text, self._anthropic_client, model=self._ai_model
+                )
+                violations.extend(ai_violations)
+            except Exception as exc:
+                logger.exception("Holistic AI evaluation failed")
+                eval_warnings.append(f"Holistic AI evaluation failed: {exc}")
 
         # Apply severity threshold filter
         if self._severity_threshold is not None:

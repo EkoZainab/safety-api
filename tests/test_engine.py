@@ -156,8 +156,110 @@ class TestEvaluator:
         assert results[2].flagged  # SSN
         assert not results[3].flagged  # clean
 
+    def test_holistic_ai_evaluation_called(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.LOW,
+                    keywords=["test"],
+                    message="match",
+                ),
+            ],
+        )
+        mock_client = MagicMock()
+
+        fake_violations = []
+        with patch(
+            "safety_api.engine.evaluate_with_ai", return_value=fake_violations
+        ) as mock_eval:
+            evaluator = Evaluator(
+                policies=[policy], anthropic_client=mock_client
+            )
+            evaluator.evaluate("some text")
+            mock_eval.assert_called_once_with(
+                "some text", mock_client, model=evaluator._ai_model
+            )
+
+    def test_holistic_ai_violations_merged(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from safety_api.models import Match, PolicyConfig, RuleConfig, RuleType, Violation
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.LOW,
+                    keywords=["test"],
+                    message="match",
+                ),
+            ],
+        )
+        mock_client = MagicMock()
+        ai_violation = Violation(
+            rule_id="ai-pii",
+            rule_name="AI: PII",
+            policy_id="ai-holistic",
+            policy_name="AI Holistic Evaluation",
+            severity=Severity.HIGH,
+            message="PII detected",
+            source="ai",
+            confidence=0.9,
+        )
+
+        with patch(
+            "safety_api.engine.evaluate_with_ai", return_value=[ai_violation]
+        ):
+            evaluator = Evaluator(
+                policies=[policy], anthropic_client=mock_client
+            )
+            result = evaluator.evaluate("some text")
+            assert any(v.source == "ai" for v in result.violations)
+            assert any(v.rule_id == "ai-pii" for v in result.violations)
+
+    def test_holistic_ai_failure_produces_warning(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.LOW,
+                    keywords=["test"],
+                    message="match",
+                ),
+            ],
+        )
+        mock_client = MagicMock()
+
+        with patch(
+            "safety_api.engine.evaluate_with_ai",
+            side_effect=RuntimeError("API down"),
+        ):
+            evaluator = Evaluator(
+                policies=[policy], anthropic_client=mock_client
+            )
+            result = evaluator.evaluate("some text")
+            assert any("Holistic AI evaluation failed" in w for w in result.warnings)
+
     def test_disabled_semantic_rule_no_api_call(self) -> None:
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from safety_api.models import PolicyConfig, RuleConfig, RuleType
 
@@ -176,10 +278,13 @@ class TestEvaluator:
             ],
         )
         mock_client = MagicMock()
-        evaluator = Evaluator(
-            policies=[policy], anthropic_client=mock_client
-        )
-        result = evaluator.evaluate("some text")
+        # Patch holistic evaluator so the only possible API call
+        # would come from the disabled semantic rule itself.
+        with patch("safety_api.engine.evaluate_with_ai", return_value=[]):
+            evaluator = Evaluator(
+                policies=[policy], anthropic_client=mock_client
+            )
+            result = evaluator.evaluate("some text")
 
         mock_client.messages.create.assert_not_called()
         assert result.rules_evaluated == 0
