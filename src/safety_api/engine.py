@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import time
 from pathlib import Path
@@ -12,7 +13,9 @@ from safety_api.models import (
     DEFAULT_AI_MODEL,
     TEXT_PREVIEW_LENGTH,
     EvaluationResult,
+    Match,
     PolicyFile,
+    RuleType,
     Severity,
     Violation,
 )
@@ -39,6 +42,7 @@ class Evaluator:
 
     The evaluator pre-builds all rule instances at construction time so
     that repeated evaluate() calls avoid redundant setup work.
+    Semantic (API-based) rules run concurrently to minimize latency.
     """
 
     def __init__(
@@ -78,8 +82,30 @@ class Evaluator:
 
         return instances
 
+    @staticmethod
+    def _make_violation(
+        policy_file: PolicyFile,
+        rule: BaseRule,
+        matches: list[Match],
+    ) -> Violation:
+        source = "ai" if rule.config.type == RuleType.SEMANTIC else "rule"
+        return Violation(
+            rule_id=rule.config.id,
+            rule_name=rule.config.name,
+            policy_id=policy_file.policy.id,
+            policy_name=policy_file.policy.name,
+            severity=rule.config.severity,
+            message=rule.config.message,
+            matches=matches,
+            tags=rule.config.tags,
+            source=source,
+        )
+
     def evaluate(self, text: str) -> EvaluationResult:
         """Evaluate a text string against all loaded policies and rules.
+
+        Deterministic rules (keyword, regex) run synchronously.
+        Semantic rules (API-based) run concurrently via a thread pool.
 
         Args:
             text: The input text to evaluate.
@@ -92,26 +118,45 @@ class Evaluator:
         violations: list[Violation] = []
         rules_evaluated = 0
 
+        deterministic: list[tuple[PolicyFile, BaseRule]] = []
+        semantic: list[tuple[PolicyFile, BaseRule]] = []
+
         for policy_file, rule in self._rule_instances:
+            if rule.config.type == RuleType.SEMANTIC:
+                semantic.append((policy_file, rule))
+            else:
+                deterministic.append((policy_file, rule))
+
+        # Evaluate deterministic rules synchronously (fast)
+        for policy_file, rule in deterministic:
             matches = rule.evaluate(text)
             rules_evaluated += 1
-
             if matches:
-                source = (
-                    "ai" if rule.config.type.value == "semantic" else "rule"
-                )
-                violation = Violation(
-                    rule_id=rule.config.id,
-                    rule_name=rule.config.name,
-                    policy_id=policy_file.policy.id,
-                    policy_name=policy_file.policy.name,
-                    severity=rule.config.severity,
-                    message=rule.config.message,
-                    matches=matches,
-                    tags=rule.config.tags,
-                    source=source,
-                )
-                violations.append(violation)
+                violations.append(self._make_violation(policy_file, rule, matches))
+
+        # Evaluate semantic rules concurrently (I/O-bound API calls)
+        if semantic:
+            max_workers = min(len(semantic), 10)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = {
+                    pool.submit(rule.evaluate, text): (policy_file, rule)
+                    for policy_file, rule in semantic
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    policy_file, rule = futures[future]
+                    rules_evaluated += 1
+                    try:
+                        matches = future.result()
+                    except Exception:
+                        logger.exception(
+                            "Rule '%s' failed during evaluation",
+                            rule.config.id,
+                        )
+                        continue
+                    if matches:
+                        violations.append(
+                            self._make_violation(policy_file, rule, matches)
+                        )
 
         # Apply severity threshold filter
         if self._severity_threshold is not None:
