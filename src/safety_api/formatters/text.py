@@ -53,7 +53,13 @@ def format_text(result: EvaluationResult) -> str:
             f"RESULT: FLAGGED  |  Score: {result.total_score:.1f}  "
             f"|  Max Severity: {max_sev}"
         )
-        lines.append(f"Violations: {result.violation_count}")
+        by_sev = result.violations_by_severity
+        breakdown = ", ".join(
+            f"{count} {sev.value}" for sev, count in sorted(
+                by_sev.items(), key=lambda x: x[0].weight, reverse=True
+            )
+        )
+        lines.append(f"Violations: {result.violation_count} ({breakdown})")
         lines.append(_THIN_SEP)
 
         for i, violation in enumerate(result.violations, 1):

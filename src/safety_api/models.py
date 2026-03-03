@@ -7,7 +7,7 @@ import types
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 TEXT_PREVIEW_LENGTH = 200
 DEFAULT_AI_MODEL = "claude-sonnet-4-20250514"
@@ -149,9 +149,20 @@ class EvaluationResult(BaseModel):
     flagged: bool = False
     evaluation_time_ms: float = 0.0
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def violation_count(self) -> int:
+        """Total number of violations."""
         return len(self.violations)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def violations_by_severity(self) -> dict[Severity, int]:
+        """Count of violations grouped by severity level."""
+        counts: dict[Severity, int] = {}
+        for v in self.violations:
+            counts[v.severity] = counts.get(v.severity, 0) + 1
+        return counts
 
     def compute_score(self) -> None:
         """Compute aggregate score and severity from collected violations."""
