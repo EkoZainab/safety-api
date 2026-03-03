@@ -119,13 +119,6 @@ class SemanticRule(BaseRule):
             return [Match(start=0, end=text_len, matched_text="[full text]")]
 
         except (ValidationError, json.JSONDecodeError) as e:
-            logger.warning(
-                "Invalid API response for semantic rule '%s': %s",
-                self.rule_id, e,
-            )
-            return []
-        except Exception:
-            logger.exception(
-                "API call failed for semantic rule '%s'", self.rule_id
-            )
-            return []
+            raise RuntimeError(
+                f"Invalid API response for rule '{self.rule_id}': {e}"
+            ) from e

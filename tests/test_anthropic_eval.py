@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from safety_api.anthropic_eval import evaluate_with_ai
 from safety_api.models import Severity
 
@@ -60,16 +62,16 @@ class TestEvaluateWithAI:
         violations = evaluate_with_ai("some text", client)
         assert len(violations) == 2
 
-    def test_api_error_returns_empty(self) -> None:
+    def test_api_error_raises(self) -> None:
         client = MagicMock()
         client.messages.create.side_effect = RuntimeError("Service unavailable")
-        violations = evaluate_with_ai("text", client)
-        assert violations == []
+        with pytest.raises(RuntimeError, match="Service unavailable"):
+            evaluate_with_ai("text", client)
 
-    def test_invalid_json_returns_empty(self) -> None:
+    def test_invalid_json_raises(self) -> None:
         client = _make_mock_client("not json at all")
-        violations = evaluate_with_ai("text", client)
-        assert violations == []
+        with pytest.raises(RuntimeError, match="Invalid AI evaluation response"):
+            evaluate_with_ai("text", client)
 
     def test_default_confidence(self) -> None:
         response = (
@@ -84,13 +86,13 @@ class TestEvaluateWithAI:
         violations = evaluate_with_ai("text", client)
         assert violations[0].confidence == 0.8  # default
 
-    def test_malformed_response_structure(self) -> None:
+    def test_malformed_response_structure_raises(self) -> None:
         # violations should be a list, not a string
         client = _make_mock_client('{"violations": "not a list"}')
-        violations = evaluate_with_ai("text", client)
-        assert violations == []
+        with pytest.raises(RuntimeError, match="Invalid AI evaluation response"):
+            evaluate_with_ai("text", client)
 
-    def test_missing_severity_field(self) -> None:
+    def test_missing_severity_field_raises(self) -> None:
         response = (
             '{"violations": [{'
             '"category": "Test",'
@@ -99,8 +101,8 @@ class TestEvaluateWithAI:
             "}]}"
         )
         client = _make_mock_client(response)
-        violations = evaluate_with_ai("text", client)
-        assert violations == []
+        with pytest.raises(RuntimeError, match="Invalid AI evaluation response"):
+            evaluate_with_ai("text", client)
 
     def test_out_of_bounds_spans_clamped(self) -> None:
         response = (
@@ -119,7 +121,7 @@ class TestEvaluateWithAI:
         for m in violations[0].matches:
             assert m.end <= len(text)
 
-    def test_invalid_confidence_range(self) -> None:
+    def test_invalid_confidence_range_raises(self) -> None:
         response = (
             '{"violations": [{'
             '"category": "Test",'
@@ -130,10 +132,10 @@ class TestEvaluateWithAI:
             "}]}"
         )
         client = _make_mock_client(response)
-        violations = evaluate_with_ai("text", client)
-        assert violations == []
+        with pytest.raises(RuntimeError, match="Invalid AI evaluation response"):
+            evaluate_with_ai("text", client)
 
-    def test_negative_span_indices(self) -> None:
+    def test_negative_span_indices_raises(self) -> None:
         response = (
             '{"violations": [{'
             '"category": "Test",'
@@ -144,5 +146,5 @@ class TestEvaluateWithAI:
             "}]}"
         )
         client = _make_mock_client(response)
-        violations = evaluate_with_ai("text", client)
-        assert violations == []
+        with pytest.raises(RuntimeError, match="Invalid AI evaluation response"):
+            evaluate_with_ai("text", client)

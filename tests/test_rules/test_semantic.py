@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from safety_api.models import RuleConfig
 from safety_api.rules.semantic import SemanticRule
 
@@ -77,7 +79,7 @@ class TestSemanticRule:
         matches = rule.evaluate("Perfectly fine text")
         assert matches == []
 
-    def test_api_error_returns_empty(
+    def test_api_error_raises(
         self, semantic_rule_config: RuleConfig
     ) -> None:
         client = MagicMock()
@@ -86,10 +88,10 @@ class TestSemanticRule:
             semantic_rule_config, anthropic_client=client
         )
 
-        matches = rule.evaluate("Some text")
-        assert matches == []
+        with pytest.raises(RuntimeError, match="API down"):
+            rule.evaluate("Some text")
 
-    def test_invalid_json_returns_empty(
+    def test_invalid_json_raises(
         self, semantic_rule_config: RuleConfig
     ) -> None:
         client = _make_mock_client("not valid json {{{")
@@ -97,8 +99,8 @@ class TestSemanticRule:
             semantic_rule_config, anthropic_client=client
         )
 
-        matches = rule.evaluate("Some text")
-        assert matches == []
+        with pytest.raises(RuntimeError, match="Invalid API response"):
+            rule.evaluate("Some text")
 
     def test_passes_prompt_to_api(
         self, semantic_rule_config: RuleConfig

@@ -142,8 +142,6 @@ def evaluate_with_ai(
         return violations
 
     except (ValidationError, json.JSONDecodeError) as e:
-        logger.warning("Invalid AI evaluation response: %s", e)
-        return []
-    except Exception:
-        logger.exception("Holistic AI evaluation failed")
-        return []
+        raise RuntimeError(
+            f"Invalid AI evaluation response: {e}"
+        ) from e
