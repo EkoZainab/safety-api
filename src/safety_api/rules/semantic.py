@@ -6,10 +6,29 @@ import json
 import logging
 from typing import Any
 
+from pydantic import BaseModel, Field, ValidationError
+
 from safety_api.models import Match, RuleConfig
 from safety_api.rules.base import BaseRule
 
 logger = logging.getLogger(__name__)
+
+
+class _SpanResponse(BaseModel):
+    """Validated span from semantic API response."""
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    text: str = ""
+
+
+class _SemanticResponse(BaseModel):
+    """Validated API response for semantic evaluation."""
+
+    flagged: bool
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    explanation: str = ""
+    spans: list[_SpanResponse] = Field(default_factory=list)
 
 
 class SemanticRule(BaseRule):
@@ -62,7 +81,10 @@ class SemanticRule(BaseRule):
             "\"text\": str}]}\n"
             "If no violation is found, set flagged=false and spans to an empty list."
         )
-        user_msg = f"{evaluation_prompt}\n\n---\nTEXT TO EVALUATE:\n{text}\n---"
+        user_msg = (
+            f"{evaluation_prompt}\n\n"
+            f"<text_to_evaluate>\n{text}\n</text_to_evaluate>"
+        )
 
         try:
             response = self._client.messages.create(
@@ -72,25 +94,36 @@ class SemanticRule(BaseRule):
                 messages=[{"role": "user", "content": user_msg}],
             )
             content = response.content[0].text
-            result = json.loads(content)
+            result = _SemanticResponse.model_validate(json.loads(content))
 
-            if not result.get("flagged"):
+            if not result.flagged:
                 return []
 
-            spans = result.get("spans", [])
-            if spans:
-                return [
-                    Match(
-                        start=s["start"],
-                        end=s["end"],
-                        matched_text=s.get("text", ""),
-                    )
-                    for s in spans
-                ]
+            text_len = len(text)
+            if result.spans:
+                matches: list[Match] = []
+                for s in result.spans:
+                    clamped_start = min(s.start, text_len)
+                    clamped_end = min(s.end, text_len)
+                    if clamped_start >= clamped_end:
+                        continue
+                    matches.append(Match(
+                        start=clamped_start,
+                        end=clamped_end,
+                        matched_text=s.text or text[clamped_start:clamped_end],
+                    ))
+                if matches:
+                    return matches
 
-            # Flagged but no specific spans — flag the entire text
-            return [Match(start=0, end=len(text), matched_text="[full text]")]
+            # Flagged but no valid spans — flag the entire text
+            return [Match(start=0, end=text_len, matched_text="[full text]")]
 
+        except (ValidationError, json.JSONDecodeError) as e:
+            logger.warning(
+                "Invalid API response for semantic rule '%s': %s",
+                self.rule_id, e,
+            )
+            return []
         except Exception:
             logger.exception(
                 "API call failed for semantic rule '%s'", self.rule_id
