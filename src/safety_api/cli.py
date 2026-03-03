@@ -122,6 +122,12 @@ def _get_anthropic_client() -> Any:
     help="Model to use for AI evaluation.",
 )
 @click.option(
+    "--strict",
+    is_flag=True,
+    default=False,
+    help="Fail fast on any invalid policy file instead of skipping it.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
@@ -144,6 +150,7 @@ def main(
     severity_threshold: str | None,
     use_ai: bool,
     ai_model: str,
+    strict: bool,
     dry_run: bool,
     verbose: bool,
 ) -> None:
@@ -172,6 +179,7 @@ def main(
 
     evaluator = Evaluator.from_policy_dir(
         policy_dir=resolved_policy_dir,
+        strict=strict,
         anthropic_client=anthropic_client,
         ai_model=ai_model,
         severity_threshold=severity,

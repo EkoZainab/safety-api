@@ -208,16 +208,19 @@ class Evaluator:
     def from_policy_dir(
         cls,
         policy_dir: Path,
+        *,
+        strict: bool = False,
         **kwargs: Any,
     ) -> Evaluator:
         """Create an Evaluator by loading all policies from a directory.
 
         Args:
             policy_dir: Directory containing YAML policy files.
+            strict: If True, raise on any invalid policy file.
             **kwargs: Additional arguments passed to the Evaluator constructor.
 
         Returns:
             A configured Evaluator instance.
         """
-        policies = load_policies(policy_dir)
+        policies = load_policies(policy_dir, strict=strict)
         return cls(policies=policies, **kwargs)

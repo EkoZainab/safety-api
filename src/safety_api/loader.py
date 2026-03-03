@@ -31,17 +31,25 @@ def load_policy_file(path: Path) -> PolicyFile:
     return PolicyFile.model_validate(raw)
 
 
-def load_policies(policy_dir: Path) -> list[PolicyFile]:
+def load_policies(
+    policy_dir: Path,
+    *,
+    strict: bool = False,
+) -> list[PolicyFile]:
     """Load all YAML policy files from a directory.
-
-    Files that fail validation are logged as errors and skipped,
-    allowing partial policy loading when some files are malformed.
 
     Args:
         policy_dir: Directory containing .yaml/.yml files.
+        strict: If True, raise on the first invalid policy file
+            instead of skipping it. Use this in security-critical
+            deployments where partial loading is unacceptable.
 
     Returns:
         List of validated PolicyFile models for enabled policies.
+
+    Raises:
+        yaml.YAMLError: In strict mode, if a file is not valid YAML.
+        ValidationError: In strict mode, if a file fails schema validation.
     """
     policies: list[PolicyFile] = []
     yaml_files = sorted(
@@ -66,6 +74,8 @@ def load_policies(policy_dir: Path) -> list[PolicyFile]:
             else:
                 logger.info("Skipping disabled policy in %s", path.name)
         except (yaml.YAMLError, ValidationError) as exc:
+            if strict:
+                raise
             logger.error("Failed to load policy from %s: %s", path, exc)
 
     return policies
