@@ -83,7 +83,9 @@ def semantic_rule_config() -> RuleConfig:
 
 
 @pytest.fixture
-def pii_policy(email_rule_config: RuleConfig, ssn_rule_config: RuleConfig) -> PolicyFile:
+def pii_policy(
+    email_rule_config: RuleConfig, ssn_rule_config: RuleConfig
+) -> PolicyFile:
     return PolicyFile(
         policy=PolicyConfig(id="test-pii", name="Test PII Policy"),
         rules=[email_rule_config, ssn_rule_config],

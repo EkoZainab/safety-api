@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from safety_api.models import RuleConfig, RuleType, Severity
+from safety_api.models import RuleConfig
 from safety_api.rules.semantic import SemanticRule
 
 
