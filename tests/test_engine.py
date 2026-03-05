@@ -185,7 +185,10 @@ class TestEvaluator:
             )
             evaluator.evaluate("some text")
             mock_eval.assert_called_once_with(
-                "some text", mock_client, model=evaluator._ai_model
+                "some text",
+                mock_client,
+                model=evaluator._ai_model,
+                timeout=evaluator._ai_timeout,
             )
 
     def test_holistic_ai_violations_merged(self) -> None:

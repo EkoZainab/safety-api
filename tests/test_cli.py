@@ -304,6 +304,28 @@ class TestCLI:
             for m in v["matches"]:
                 assert m["matched_text"] == "[REDACTED]"
 
+    def test_ai_timeout_flag_accepted(
+        self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        runner = CliRunner()
+        # --ai-timeout requires --use-ai, which requires API key — just verify
+        # the flag is accepted by the parser (error should be about the key)
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--use-ai",
+                "--ai-timeout",
+                "60",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "ANTHROPIC_API_KEY" in result.output
+
     def test_ai_model_flag_accepted(
         self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

@@ -14,6 +14,7 @@ from safety_api.anthropic_eval import evaluate_with_ai
 from safety_api.loader import load_policies, load_policies_with_errors
 from safety_api.models import (
     DEFAULT_AI_MODEL,
+    DEFAULT_AI_TIMEOUT,
     TEXT_PREVIEW_LENGTH,
     EvaluationResult,
     Match,
@@ -68,12 +69,14 @@ class Evaluator:
         policies: list[PolicyFile],
         anthropic_client: AnthropicClientProtocol | None = None,
         ai_model: str = DEFAULT_AI_MODEL,
+        ai_timeout: float = DEFAULT_AI_TIMEOUT,
         severity_threshold: Severity | None = None,
         load_errors: list[str] | None = None,
     ) -> None:
         self._policies = policies
         self._anthropic_client = anthropic_client
         self._ai_model = ai_model
+        self._ai_timeout = ai_timeout
         self._severity_threshold = severity_threshold
         self._load_errors: list[str] = load_errors or []
         self._build_warnings: list[str] = []
@@ -92,6 +95,7 @@ class Evaluator:
                 if rule_config.type.value == "semantic":
                     kwargs["anthropic_client"] = self._anthropic_client
                     kwargs["model"] = self._ai_model
+                    kwargs["timeout"] = self._ai_timeout
 
                 try:
                     rule = create_rule(rule_config, **kwargs)
@@ -206,7 +210,10 @@ class Evaluator:
         if self._anthropic_client is not None:
             try:
                 ai_violations = evaluate_with_ai(
-                    text, self._anthropic_client, model=self._ai_model
+                    text,
+                    self._anthropic_client,
+                    model=self._ai_model,
+                    timeout=self._ai_timeout,
                 )
                 violations.extend(ai_violations)
             except Exception as exc:

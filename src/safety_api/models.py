@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, computed_field, field_validator
 
 TEXT_PREVIEW_LENGTH = 200
 DEFAULT_AI_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_AI_TIMEOUT = 30  # seconds
 MAX_INPUT_SIZE = 102_400  # 100 KB
 
 _SEVERITY_WEIGHTS: types.MappingProxyType[str, int] = types.MappingProxyType({

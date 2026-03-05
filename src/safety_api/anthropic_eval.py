@@ -11,9 +11,10 @@ import json
 import logging
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, Field, ValidationError
 
-from safety_api.models import DEFAULT_AI_MODEL, Match, Severity, Violation
+from safety_api.models import DEFAULT_AI_MODEL, DEFAULT_AI_TIMEOUT, Match, Severity, Violation
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ def evaluate_with_ai(
     text: str,
     client: Any,
     model: str = DEFAULT_AI_MODEL,
+    timeout: float = DEFAULT_AI_TIMEOUT,
 ) -> list[Violation]:
     """Run a holistic AI evaluation across all policy categories.
 
@@ -86,6 +88,7 @@ def evaluate_with_ai(
         text: Text to evaluate.
         client: An initialized anthropic.Anthropic client.
         model: Model ID to use for evaluation.
+        timeout: Timeout in seconds for the API call.
 
     Returns:
         List of Violation objects found by AI analysis.
@@ -107,6 +110,7 @@ def evaluate_with_ai(
                     ),
                 }
             ],
+            timeout=httpx.Timeout(timeout, connect=10.0),
         )
         content = response.content[0].text
         data = _HolisticResponse.model_validate(json.loads(content))

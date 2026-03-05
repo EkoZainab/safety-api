@@ -6,9 +6,10 @@ import json
 import logging
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, Field, ValidationError
 
-from safety_api.models import DEFAULT_AI_MODEL, Match, RuleConfig
+from safety_api.models import DEFAULT_AI_MODEL, DEFAULT_AI_TIMEOUT, Match, RuleConfig
 from safety_api.rules.base import BaseRule
 
 logger = logging.getLogger(__name__)
@@ -47,10 +48,12 @@ class SemanticRule(BaseRule):
         config: RuleConfig,
         anthropic_client: Any | None = None,
         model: str = DEFAULT_AI_MODEL,
+        timeout: float = DEFAULT_AI_TIMEOUT,
     ) -> None:
         super().__init__(config)
         self._client = anthropic_client
         self._model = model
+        self._timeout = timeout
 
     def evaluate(self, text: str) -> list[Match]:
         """Evaluate text using the Anthropic API.
@@ -93,6 +96,7 @@ class SemanticRule(BaseRule):
                 max_tokens=1024,
                 system=system_msg,
                 messages=[{"role": "user", "content": user_msg}],
+                timeout=httpx.Timeout(self._timeout, connect=10.0),
             )
             content = response.content[0].text
             result = _SemanticResponse.model_validate(json.loads(content))

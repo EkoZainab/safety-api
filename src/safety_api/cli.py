@@ -12,7 +12,7 @@ import click
 from safety_api.engine import Evaluator
 from safety_api.formatters.json_fmt import format_json
 from safety_api.formatters.text import format_text
-from safety_api.models import DEFAULT_AI_MODEL, MAX_INPUT_SIZE, Severity, redact_result
+from safety_api.models import DEFAULT_AI_MODEL, DEFAULT_AI_TIMEOUT, MAX_INPUT_SIZE, Severity, redact_result
 
 # Default policy directory is the policies/ dir at the project root
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent.parent.parent / "policies"
@@ -122,6 +122,13 @@ def _get_anthropic_client() -> Any:
     help="Model to use for AI evaluation.",
 )
 @click.option(
+    "--ai-timeout",
+    type=float,
+    default=DEFAULT_AI_TIMEOUT,
+    show_default=True,
+    help="Timeout in seconds for AI API calls.",
+)
+@click.option(
     "--max-input-size",
     type=int,
     default=MAX_INPUT_SIZE,
@@ -163,6 +170,7 @@ def main(
     severity_threshold: str | None,
     use_ai: bool,
     ai_model: str,
+    ai_timeout: float,
     max_input_size: int,
     redact: bool,
     strict: bool,
@@ -201,6 +209,7 @@ def main(
         strict=strict,
         anthropic_client=anthropic_client,
         ai_model=ai_model,
+        ai_timeout=ai_timeout,
         severity_threshold=severity,
     )
 
