@@ -49,7 +49,7 @@ class Evaluator:
     def __init__(
         self,
         policies: list[PolicyFile],
-        anthropic_client: AnthropicClientProtocol | Any | None = None,
+        anthropic_client: AnthropicClientProtocol | None = None,
         ai_model: str = DEFAULT_AI_MODEL,
         severity_threshold: Severity | None = None,
     ) -> None:
