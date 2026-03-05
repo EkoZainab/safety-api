@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 _REGEX_EVAL_TIMEOUT = 5  # seconds
 
 
+class RegexTimeoutError(RuntimeError):
+    """Raised when regex evaluation exceeds the timeout."""
+
+
 class RegexRule(BaseRule):
     """Matches regular expression patterns in text.
 
@@ -49,12 +53,9 @@ class RegexRule(BaseRule):
         thread.join(timeout=_REGEX_EVAL_TIMEOUT)
 
         if thread.is_alive():
-            logger.warning(
-                "Regex evaluation timed out after %ds for rule '%s' — "
-                "pattern may be vulnerable to ReDoS",
-                _REGEX_EVAL_TIMEOUT,
-                self.rule_id,
+            raise RegexTimeoutError(
+                f"Regex evaluation timed out after {_REGEX_EVAL_TIMEOUT}s "
+                f"for rule '{self.rule_id}' — pattern may be vulnerable to ReDoS"
             )
-            return []
 
         return result

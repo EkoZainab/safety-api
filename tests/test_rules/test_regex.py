@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from safety_api.models import RuleConfig, RuleType, Severity
-from safety_api.rules.regex import RegexRule
+from safety_api.rules.regex import RegexRule, RegexTimeoutError
 
 
 class TestRegexRule:
@@ -103,21 +103,23 @@ class TestRegexRule:
         with pytest.raises(ValueError, match="non-empty pattern"):
             RegexRule(config)
 
-    def test_redos_timeout_returns_empty(self) -> None:
-        """Verify that a regex exceeding the timeout returns empty results."""
+    def test_redos_timeout_raises(self) -> None:
+        """Verify that a regex exceeding the timeout raises RegexTimeoutError."""
         config = RuleConfig(
             id="redos",
             name="ReDoS Pattern",
             type=RuleType.REGEX,
             severity=Severity.HIGH,
-            pattern=r"(a+)+b",
+            pattern=r"\d+",
             message="redos test",
         )
         rule = RegexRule(config)
 
-        # Patch the timeout to a tiny value so the test runs fast
-        with patch("safety_api.rules.regex._REGEX_EVAL_TIMEOUT", 0.001):
-            # Feed input known to cause catastrophic backtracking
-            evil_input = "a" * 30 + "c"
-            matches = rule.evaluate(evil_input)
-            assert matches == []
+        # Mock Thread so is_alive() returns True (simulates timeout)
+        # because Python's re module holds the GIL, making real
+        # thread timeouts unreliable.
+        with patch("safety_api.rules.regex.threading.Thread") as MockThread:
+            mock_thread = MockThread.return_value
+            mock_thread.is_alive.return_value = True
+            with pytest.raises(RegexTimeoutError):
+                rule.evaluate("123")
