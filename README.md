@@ -14,8 +14,9 @@ src/safety_api/
 ├── rules/
 │   ├── base.py        # Abstract base class for rules
 │   ├── keyword.py     # Keyword/phrase matching (compiled to single regex)
-│   ├── regex.py       # Regex pattern matching
-│   └── semantic.py    # API-based semantic evaluation
+│   ├── regex.py       # Regex pattern matching with optional post-match validation
+│   ├── semantic.py    # API-based semantic evaluation
+│   └── validators.py  # Post-match validators (e.g. Luhn checksum for credit cards)
 └── formatters/
     ├── text.py        # Human-readable report output
     └── json_fmt.py    # JSON output via Pydantic serialization
@@ -90,6 +91,9 @@ Enable semantic analysis using the Anthropic API for detecting nuanced violation
 ```bash
 export ANTHROPIC_API_KEY=your-key-here
 safety-api --text "some text" --use-ai
+
+# Set a custom timeout for AI API calls (default: 30s)
+safety-api --text "some text" --use-ai --ai-timeout 60
 ```
 
 ### Input size limit
@@ -129,10 +133,12 @@ Policies are defined in YAML files in the `policies/` directory. Each file conta
 
 ### Included policies
 
-- **pii_detection.yaml** — email addresses, SSNs, phone numbers, credit card numbers
+- **pii_detection.yaml** — email addresses, SSNs (multiple formats), phone numbers, credit card numbers (with Luhn validation)
 - **hate_speech.yaml** — dehumanizing language, supremacist rhetoric, calls for group violence
 - **prompt_injection.yaml** — instruction overrides, role assumption, system prompt extraction, encoding evasion
 - **violence_threats.yaml** — direct threats, weapons in threatening context, self-harm, mass violence
+- **sexual_content.yaml** — explicit sexual terms, solicitation phrases, CSAM references
+- **profanity.yaml** — strong profanity, offensive slurs, masked profanity patterns
 
 ### Writing custom policies
 
@@ -150,6 +156,7 @@ rules:
     type: regex                    # regex, keyword, or semantic
     severity: HIGH                 # LOW, MEDIUM, HIGH, or CRITICAL
     pattern: "your-regex-here"
+    validator: luhn                # optional: post-match validator (e.g. luhn)
     message: Description of what was detected
     enabled: true
     tags: [custom, category]
@@ -195,4 +202,7 @@ mypy src/
 - **Click** over argparse for decorator-based CLI definition and built-in test runner.
 - **Rule factory pattern** for extensibility — new rule types are a single class + registry entry.
 - **Fail-closed architecture** — rule crashes, regex timeouts, AI failures, and invalid policies result in an incomplete evaluation (exit code 2) rather than silently passing content as clean. Semantic rules without an API client are intentional config and do not trigger incomplete.
+- **Text normalization** — zero-width characters are stripped and NFKC normalization is applied before rule evaluation to prevent trivial Unicode bypass techniques. The original text is preserved for `text_preview`.
+- **Post-match validation** — regex rules support an optional `validator` field (e.g. `luhn`) to filter false positives after pattern matching.
+- **AI call timeouts** — all Anthropic API calls use `httpx.Timeout` (default 30s, connect 10s) to prevent indefinite hangs.
 - **Deterministic scoring** — aggregate score is the sum of `severity_weight * confidence` across all violations, giving consistent, explainable results.

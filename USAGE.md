@@ -109,6 +109,9 @@ safety-api --text "some text" --use-ai
 
 # Use a specific model
 safety-api --text "some text" --use-ai --ai-model claude-haiku-4-5-20251001
+
+# Set a custom timeout for AI API calls (default: 30s)
+safety-api --text "some text" --use-ai --ai-timeout 60
 ```
 
 When `--use-ai` is enabled, two things happen:
@@ -223,8 +226,14 @@ rules:
 | Type       | Fields                                          | Requires API |
 |------------|-------------------------------------------------|-------------|
 | `keyword`  | `keywords`, `case_sensitive`, `match_whole_word` | No          |
-| `regex`    | `pattern`                                        | No          |
+| `regex`    | `pattern`, `validator` (optional)                | No          |
 | `semantic` | `prompt`                                         | Yes         |
+
+The `validator` field on regex rules applies a post-match validation function. Available validators:
+
+| Validator | Description |
+|-----------|-------------|
+| `luhn`    | Luhn checksum — filters out numbers that fail the credit card check digit algorithm |
 
 ### Disabling rules or policies
 
@@ -312,6 +321,7 @@ safety-api --text "test" --verbose
 | `--severity-threshold`  | `-s`  | Minimum severity to report                     |
 | `--use-ai`              |       | Enable AI-based evaluation                     |
 | `--ai-model`            |       | Model for AI evaluation                        |
+| `--ai-timeout`          |       | Timeout in seconds for AI API calls (default: 30) |
 | `--max-input-size`      |       | Max input size in bytes (default: 102400)      |
 | `--redact`              |       | Mask matched text and preview in output        |
 | `--strict`              |       | Fail on invalid policy files                   |
