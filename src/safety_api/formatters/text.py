@@ -47,6 +47,12 @@ def format_text(result: EvaluationResult) -> str:
         _THIN_SEP,
     ]
 
+    if result.incomplete:
+        lines.append("RESULT: INCOMPLETE")
+        for reason in result.incomplete_reasons:
+            lines.append(f"  - {reason}")
+        lines.append(_THIN_SEP)
+
     if result.flagged:
         max_sev = result.max_severity.value if result.max_severity else "N/A"
         lines.append(
@@ -64,6 +70,10 @@ def format_text(result: EvaluationResult) -> str:
 
         for i, violation in enumerate(result.violations, 1):
             lines.extend(_format_violation(i, violation))
+    elif result.incomplete:
+        lines.append(
+            "NO VIOLATIONS DETECTED | But evaluation was incomplete"
+        )
     else:
         lines.append("RESULT: CLEAN  |  No violations detected")
 

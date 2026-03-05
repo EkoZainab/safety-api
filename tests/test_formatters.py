@@ -103,6 +103,27 @@ class TestTextFormatter:
         assert "Warnings" not in output
 
 
+    def test_incomplete_result_rendering(self) -> None:
+        result = _make_clean_result()
+        result.incomplete = True
+        result.incomplete_reasons = ["Rule 'x' failed: timeout"]
+        output = format_text(result)
+        assert "INCOMPLETE" in output
+        assert "Rule 'x' failed: timeout" in output
+        assert "NO VIOLATIONS DETECTED | But evaluation was incomplete" in output
+
+    def test_incomplete_and_flagged_rendering(self) -> None:
+        result = _make_flagged_result()
+        result.incomplete = True
+        result.incomplete_reasons = ["AI evaluation failed"]
+        output = format_text(result)
+        assert "INCOMPLETE" in output
+        assert "FLAGGED" in output
+        assert "AI evaluation failed" in output
+        # Should NOT show "But evaluation was incomplete" since flagged
+        assert "But evaluation was incomplete" not in output
+
+
 class TestJsonFormatter:
     def test_valid_json_output(self) -> None:
         output = format_json(_make_clean_result())
@@ -124,3 +145,12 @@ class TestJsonFormatter:
         data = json.loads(output)
         assert data["total_score"] == result.total_score
         assert data["max_severity"] == "CRITICAL"
+
+    def test_json_incomplete_fields(self) -> None:
+        result = _make_clean_result()
+        result.incomplete = True
+        result.incomplete_reasons = ["Load error"]
+        output = format_json(result)
+        data = json.loads(output)
+        assert data["incomplete"] is True
+        assert data["incomplete_reasons"] == ["Load error"]
