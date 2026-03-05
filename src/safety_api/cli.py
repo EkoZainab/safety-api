@@ -156,9 +156,13 @@ def main(
 ) -> None:
     """Evaluate text against configurable content safety policies.
 
-    Provide input via --text, --file, or --stdin. The tool exits with
-    code 0 for clean text and code 1 when violations are found, making
-    it suitable for CI/CD pipeline integration.
+    Provide input via --text, --file, or --stdin.
+
+    \b
+    Exit codes:
+      0  Clean and complete — no violations found.
+      1  Flagged — violations found (takes priority over incomplete).
+      2  Incomplete — evaluation was degraded but no violations found.
     """
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.WARNING,
@@ -209,5 +213,10 @@ def main(
     else:
         click.echo(format_text(result))
 
-    # Exit code: 1 if flagged, 0 if clean
-    sys.exit(1 if result.flagged else 0)
+    # Exit code: 1 if flagged, 2 if incomplete, 0 if clean
+    if result.flagged:
+        sys.exit(1)
+    elif result.incomplete:
+        sys.exit(2)
+    else:
+        sys.exit(0)

@@ -185,6 +185,49 @@ class TestCLI:
         )
         assert result.exit_code != 0
 
+    def test_empty_policy_dir_exits_two(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["--text", "Hello world", "--policy-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 2
+
+    def test_flagged_and_incomplete_exits_one(self, tmp_path: Path) -> None:
+        """Flagged takes priority over incomplete."""
+        valid_data = {
+            "policy": {"id": "p", "name": "P", "enabled": True},
+            "rules": [
+                {
+                    "id": "email",
+                    "name": "Email",
+                    "type": "regex",
+                    "severity": "HIGH",
+                    "pattern": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+                    "message": "Email detected",
+                    "enabled": True,
+                }
+            ],
+        }
+        (tmp_path / "a_valid.yaml").write_text(
+            yaml.dump(valid_data), encoding="utf-8"
+        )
+        (tmp_path / "b_invalid.yaml").write_text(
+            "policy:\n  id: broken\nrules:\n  - bad: true\n", encoding="utf-8"
+        )
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Email test@example.com",
+                "--policy-dir",
+                str(tmp_path),
+            ],
+        )
+        # Flagged (exit 1) takes priority over incomplete (exit 2)
+        assert result.exit_code == 1
+
     def test_ai_model_flag_accepted(
         self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
