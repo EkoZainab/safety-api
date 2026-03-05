@@ -16,6 +16,7 @@ from safety_api.models import (
     RuleType,
     Severity,
     Violation,
+    redact_result,
 )
 
 
@@ -278,3 +279,67 @@ class TestEvaluationResult:
         assert data["text_preview"] == "test text"
         assert data["policies_evaluated"] == 2
         assert data["flagged"] is False
+
+
+class TestRedactResult:
+    def test_redact_replaces_text_preview(self) -> None:
+        result = EvaluationResult(
+            text_preview="sensitive text here",
+            policies_evaluated=1,
+            rules_evaluated=1,
+        )
+        redacted = redact_result(result)
+        assert redacted.text_preview == "[REDACTED]"
+        # Original is not mutated
+        assert result.text_preview == "sensitive text here"
+
+    def test_redact_replaces_matched_text(self) -> None:
+        result = EvaluationResult(
+            text_preview="Email test@example.com",
+            policies_evaluated=1,
+            rules_evaluated=1,
+            violations=[
+                Violation(
+                    rule_id="r1",
+                    rule_name="R1",
+                    policy_id="p1",
+                    policy_name="P1",
+                    severity=Severity.HIGH,
+                    message="PII found",
+                    matches=[
+                        Match(start=6, end=22, matched_text="test@example.com"),
+                    ],
+                ),
+            ],
+        )
+        redacted = redact_result(result)
+        assert redacted.violations[0].matches[0].matched_text == "[REDACTED]"
+        # Original is not mutated
+        assert result.violations[0].matches[0].matched_text == "test@example.com"
+
+    def test_redact_preserves_other_fields(self) -> None:
+        result = EvaluationResult(
+            text_preview="test",
+            policies_evaluated=1,
+            rules_evaluated=1,
+            violations=[
+                Violation(
+                    rule_id="r1",
+                    rule_name="R1",
+                    policy_id="p1",
+                    policy_name="P1",
+                    severity=Severity.HIGH,
+                    message="PII found",
+                    matches=[
+                        Match(start=0, end=5, matched_text="hello"),
+                    ],
+                ),
+            ],
+            incomplete=True,
+            incomplete_reasons=["some reason"],
+        )
+        result.compute_score()
+        redacted = redact_result(result)
+        assert redacted.flagged is True
+        assert redacted.incomplete is True
+        assert redacted.violations[0].severity == Severity.HIGH

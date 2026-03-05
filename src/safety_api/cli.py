@@ -12,7 +12,7 @@ import click
 from safety_api.engine import Evaluator
 from safety_api.formatters.json_fmt import format_json
 from safety_api.formatters.text import format_text
-from safety_api.models import DEFAULT_AI_MODEL, MAX_INPUT_SIZE, Severity
+from safety_api.models import DEFAULT_AI_MODEL, MAX_INPUT_SIZE, Severity, redact_result
 
 # Default policy directory is the policies/ dir at the project root
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent.parent.parent / "policies"
@@ -129,6 +129,12 @@ def _get_anthropic_client() -> Any:
     help="Maximum input size in bytes. Rejects input exceeding this limit.",
 )
 @click.option(
+    "--redact",
+    is_flag=True,
+    default=False,
+    help="Redact matched text and text preview in output.",
+)
+@click.option(
     "--strict",
     is_flag=True,
     default=False,
@@ -158,6 +164,7 @@ def main(
     use_ai: bool,
     ai_model: str,
     max_input_size: int,
+    redact: bool,
     strict: bool,
     dry_run: bool,
     verbose: bool,
@@ -221,6 +228,9 @@ def main(
         )
 
     result = evaluator.evaluate(input_text)
+
+    if redact:
+        result = redact_result(result)
 
     # Format and output
     if output_format == "json":

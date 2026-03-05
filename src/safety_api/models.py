@@ -183,3 +183,13 @@ class EvaluationResult(BaseModel):
             self.violations, key=lambda v: v.severity.weight
         ).severity
         self.flagged = self.total_score > 0
+
+
+def redact_result(result: EvaluationResult) -> EvaluationResult:
+    """Return a copy of the result with matched text and preview redacted."""
+    redacted = result.model_copy(deep=True)
+    redacted.text_preview = "[REDACTED]"
+    for violation in redacted.violations:
+        for match in violation.matches:
+            match.matched_text = "[REDACTED]"
+    return redacted

@@ -264,6 +264,46 @@ class TestCLI:
         )
         assert result.exit_code == 0
 
+    def test_redact_flag_hides_matched_text(
+        self, sample_policy_dir: Path
+    ) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Email me at test@example.com",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--redact",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "test@example.com" not in result.output
+        assert "[REDACTED]" in result.output
+
+    def test_redact_flag_json_output(
+        self, sample_policy_dir: Path
+    ) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Email me at test@example.com",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--redact",
+                "--format",
+                "json",
+            ],
+        )
+        data = json.loads(result.output)
+        assert data["text_preview"] == "[REDACTED]"
+        for v in data["violations"]:
+            for m in v["matches"]:
+                assert m["matched_text"] == "[REDACTED]"
+
     def test_ai_model_flag_accepted(
         self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
