@@ -92,15 +92,35 @@ export ANTHROPIC_API_KEY=your-key-here
 safety-api --text "some text" --use-ai
 ```
 
+### Input size limit
+
+By default, input is limited to 100KB to prevent resource exhaustion. Override with `--max-input-size`:
+
+```bash
+safety-api --text "..." --max-input-size 204800  # 200KB
+```
+
+### Output redaction
+
+Use `--redact` to mask matched text and the text preview in output, preventing the tool from leaking the PII it detects:
+
+```bash
+safety-api --text "SSN is 123-45-6789" --redact
+```
+
 ### Exit codes
 
-- `0` — no violations found (clean)
-- `1` — violations detected (flagged)
+- `0` — no violations found, evaluation complete (clean)
+- `1` — violations detected (flagged) — takes priority over incomplete
+- `2` — evaluation was degraded (incomplete) but no violations found
+
+The tool uses a **fail-closed** architecture: when rules crash, regex times out, AI fails, or policies are invalid, the evaluation is marked **incomplete** (exit code 2) rather than silently passing content through as clean.
 
 This makes the tool suitable for CI/CD pipeline integration:
 
 ```bash
-safety-api --text "$USER_INPUT" --severity-threshold HIGH || echo "Content flagged"
+safety-api --text "$USER_INPUT" --severity-threshold HIGH
+# exit 0 = clean, exit 1 = flagged, exit 2 = incomplete (treat as failure)
 ```
 
 ## Policy Configuration
@@ -174,5 +194,5 @@ mypy src/
 - **Pydantic v2** for YAML validation at the boundary and JSON serialization. Field validators enforce cross-field constraints (e.g., keyword rules must have keywords).
 - **Click** over argparse for decorator-based CLI definition and built-in test runner.
 - **Rule factory pattern** for extensibility — new rule types are a single class + registry entry.
-- **Graceful degradation** — invalid policy files are logged and skipped, semantic rules no-op without an API client.
+- **Fail-closed architecture** — rule crashes, regex timeouts, AI failures, and invalid policies result in an incomplete evaluation (exit code 2) rather than silently passing content as clean. Semantic rules without an API client are intentional config and do not trigger incomplete.
 - **Deterministic scoring** — aggregate score is the sum of `severity_weight * confidence` across all violations, giving consistent, explainable results.

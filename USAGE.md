@@ -9,7 +9,7 @@ pip3 install -e .
 # Evaluate text
 safety-api --text "Contact me at john@example.com"
 
-# Check exit code: 0 = clean, 1 = flagged
+# Check exit code: 0 = clean, 1 = flagged, 2 = incomplete
 echo $?
 ```
 
@@ -134,6 +134,27 @@ Loaded 12 rules from policies:
   semantic: 1  (API call)
 ```
 
+## Input Size Limit
+
+Input is limited to 100KB by default to prevent resource exhaustion. The limit is a hard reject (not truncation) to avoid hiding violations at the end of the input:
+
+```bash
+# Override the default 100KB limit
+safety-api --text "..." --max-input-size 204800  # 200KB
+```
+
+## Output Redaction
+
+Use `--redact` to mask matched text and the text preview in output. This prevents the tool from leaking the PII it detects:
+
+```bash
+safety-api --text "My SSN is 123-45-6789" --redact
+# Matched text shows as [REDACTED] instead of the actual SSN
+
+safety-api --text "test@example.com" --redact --format json
+# JSON output has matched_text: "[REDACTED]" and text_preview: "[REDACTED]"
+```
+
 ## Strict Mode
 
 By default, invalid policy files are skipped with a warning. Use `--strict` to fail immediately:
@@ -218,12 +239,28 @@ policy:
 
 ## CI/CD Integration
 
+### Exit codes
+
+The tool uses a **fail-closed** architecture:
+
+| Code | Meaning    | Description                                          |
+|------|------------|------------------------------------------------------|
+| `0`  | Clean      | No violations found, evaluation complete             |
+| `1`  | Flagged    | Violations detected (takes priority over incomplete) |
+| `2`  | Incomplete | Evaluation degraded but no violations found          |
+
+Exit code 2 is triggered when rules crash, regex times out, AI evaluation fails, or policy files are invalid. This ensures degraded evaluations are never silently treated as clean.
+
 ### Basic gate
 
 ```bash
 safety-api --file user_input.txt --severity-threshold HIGH
-if [ $? -ne 0 ]; then
+EXIT_CODE=$?
+if [ $EXIT_CODE -eq 1 ]; then
   echo "Content policy violation detected"
+  exit 1
+elif [ $EXIT_CODE -eq 2 ]; then
+  echo "Evaluation incomplete — treating as failure"
   exit 1
 fi
 ```
@@ -275,6 +312,8 @@ safety-api --text "test" --verbose
 | `--severity-threshold`  | `-s`  | Minimum severity to report                     |
 | `--use-ai`              |       | Enable AI-based evaluation                     |
 | `--ai-model`            |       | Model for AI evaluation                        |
+| `--max-input-size`      |       | Max input size in bytes (default: 102400)      |
+| `--redact`              |       | Mask matched text and preview in output        |
 | `--strict`              |       | Fail on invalid policy files                   |
 | `--dry-run`             |       | Show loaded rules without evaluating           |
 | `--verbose`             | `-v`  | Enable debug logging                           |
