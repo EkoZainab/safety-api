@@ -228,6 +228,42 @@ class TestCLI:
         # Flagged (exit 1) takes priority over incomplete (exit 2)
         assert result.exit_code == 1
 
+    def test_input_size_limit_rejects_large_input(
+        self, sample_policy_dir: Path
+    ) -> None:
+        runner = CliRunner()
+        large_text = "a" * 200
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                large_text,
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--max-input-size",
+                "100",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "exceeds maximum" in result.output
+
+    def test_input_within_size_limit_passes(
+        self, sample_policy_dir: Path
+    ) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello world",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--max-input-size",
+                "1000",
+            ],
+        )
+        assert result.exit_code == 0
+
     def test_ai_model_flag_accepted(
         self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

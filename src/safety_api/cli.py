@@ -12,7 +12,7 @@ import click
 from safety_api.engine import Evaluator
 from safety_api.formatters.json_fmt import format_json
 from safety_api.formatters.text import format_text
-from safety_api.models import DEFAULT_AI_MODEL, Severity
+from safety_api.models import DEFAULT_AI_MODEL, MAX_INPUT_SIZE, Severity
 
 # Default policy directory is the policies/ dir at the project root
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent.parent.parent / "policies"
@@ -122,6 +122,13 @@ def _get_anthropic_client() -> Any:
     help="Model to use for AI evaluation.",
 )
 @click.option(
+    "--max-input-size",
+    type=int,
+    default=MAX_INPUT_SIZE,
+    show_default=True,
+    help="Maximum input size in bytes. Rejects input exceeding this limit.",
+)
+@click.option(
     "--strict",
     is_flag=True,
     default=False,
@@ -150,6 +157,7 @@ def main(
     severity_threshold: str | None,
     use_ai: bool,
     ai_model: str,
+    max_input_size: int,
     strict: bool,
     dry_run: bool,
     verbose: bool,
@@ -203,6 +211,13 @@ def main(
     if not input_text:
         raise click.UsageError(
             "Provide text via --text, --file, or --stdin."
+        )
+
+    input_len = len(input_text.encode("utf-8"))
+    if input_len > max_input_size:
+        raise click.UsageError(
+            f"Input size ({input_len:,} bytes) exceeds maximum "
+            f"({max_input_size:,} bytes). Use --max-input-size to adjust."
         )
 
     result = evaluator.evaluate(input_text)
