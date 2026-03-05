@@ -222,6 +222,50 @@ class TestEvaluationResult:
         )
         assert result.violation_count == 1
 
+    def test_incomplete_defaults_to_false(self) -> None:
+        result = EvaluationResult(
+            text_preview="test",
+            policies_evaluated=1,
+            rules_evaluated=1,
+        )
+        assert result.incomplete is False
+        assert result.incomplete_reasons == []
+
+    def test_incomplete_coexists_with_flagged(self) -> None:
+        result = EvaluationResult(
+            text_preview="test",
+            policies_evaluated=1,
+            rules_evaluated=1,
+            violations=[
+                Violation(
+                    rule_id="r1",
+                    rule_name="R1",
+                    policy_id="p1",
+                    policy_name="P1",
+                    severity=Severity.HIGH,
+                    message="v",
+                ),
+            ],
+            incomplete=True,
+            incomplete_reasons=["Rule 'x' failed"],
+        )
+        result.compute_score()
+        assert result.flagged is True
+        assert result.incomplete is True
+        assert result.incomplete_reasons == ["Rule 'x' failed"]
+
+    def test_incomplete_json_serialization(self) -> None:
+        result = EvaluationResult(
+            text_preview="test",
+            policies_evaluated=1,
+            rules_evaluated=1,
+            incomplete=True,
+            incomplete_reasons=["AI evaluation failed"],
+        )
+        data = json.loads(result.model_dump_json())
+        assert data["incomplete"] is True
+        assert data["incomplete_reasons"] == ["AI evaluation failed"]
+
     def test_json_serialization_roundtrip(self) -> None:
         result = EvaluationResult(
             text_preview="test text",

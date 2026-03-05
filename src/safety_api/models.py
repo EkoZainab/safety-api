@@ -149,6 +149,8 @@ class EvaluationResult(BaseModel):
     flagged: bool = False
     evaluation_time_ms: float = 0.0
     warnings: list[str] = Field(default_factory=list)
+    incomplete: bool = False
+    incomplete_reasons: list[str] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
