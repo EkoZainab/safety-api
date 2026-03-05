@@ -20,10 +20,12 @@ rules:
 
   - id: pii-ssn
     name: SSN Detection
-    description: Detects US Social Security Numbers in XXX-XX-XXXX format
+    description: >
+      Detects US Social Security Numbers in hyphenated, spaced, and
+      continuous formats while excluding known-invalid prefixes.
     type: regex
     severity: CRITICAL
-    pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    pattern: "\\b(?!000|666|9\\d{2})(\\d{3})[- ]?(?!00)(\\d{2})[- ]?(?!0000)(\\d{4})\\b"
     message: Possible Social Security Number detected
     enabled: true
     tags: [pii, government-id]

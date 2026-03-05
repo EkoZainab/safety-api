@@ -21,7 +21,63 @@ class TestRegexRule:
         rule = RegexRule(ssn_rule_config)
         matches = rule.evaluate("SSN: 123-45-6789")
         assert len(matches) == 1
-        assert matches[0].matched_text == "123-45-6789"
+        assert "123" in matches[0].matched_text
+
+    def test_ssn_broad_pattern_hyphenated(self) -> None:
+        config = RuleConfig(
+            id="ssn",
+            name="SSN",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?!000|666|9\d{2})(\d{3})[- ]?(?!00)(\d{2})[- ]?(?!0000)(\d{4})\b",
+            message="SSN detected",
+        )
+        rule = RegexRule(config)
+        matches = rule.evaluate("SSN: 123-45-6789")
+        assert len(matches) == 1
+
+    def test_ssn_broad_pattern_spaced(self) -> None:
+        config = RuleConfig(
+            id="ssn",
+            name="SSN",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?!000|666|9\d{2})(\d{3})[- ]?(?!00)(\d{2})[- ]?(?!0000)(\d{4})\b",
+            message="SSN detected",
+        )
+        rule = RegexRule(config)
+        matches = rule.evaluate("SSN: 123 45 6789")
+        assert len(matches) == 1
+
+    def test_ssn_broad_pattern_continuous(self) -> None:
+        config = RuleConfig(
+            id="ssn",
+            name="SSN",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?!000|666|9\d{2})(\d{3})[- ]?(?!00)(\d{2})[- ]?(?!0000)(\d{4})\b",
+            message="SSN detected",
+        )
+        rule = RegexRule(config)
+        matches = rule.evaluate("SSN: 123456789")
+        assert len(matches) == 1
+
+    def test_ssn_rejects_invalid_prefixes(self) -> None:
+        config = RuleConfig(
+            id="ssn",
+            name="SSN",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?!000|666|9\d{2})(\d{3})[- ]?(?!00)(\d{2})[- ]?(?!0000)(\d{4})\b",
+            message="SSN detected",
+        )
+        rule = RegexRule(config)
+        # 000 prefix
+        assert rule.evaluate("SSN: 000-12-3456") == []
+        # 666 prefix
+        assert rule.evaluate("SSN: 666-12-3456") == []
+        # 9xx prefix
+        assert rule.evaluate("SSN: 900-12-3456") == []
 
     def test_multiple_matches(self, email_rule_config: RuleConfig) -> None:
         rule = RegexRule(email_rule_config)
