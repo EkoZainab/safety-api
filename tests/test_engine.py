@@ -400,6 +400,72 @@ class TestEvaluator:
         result = evaluator.evaluate("some text")
         assert not result.incomplete
 
+    def test_zero_width_chars_stripped_for_matching(self) -> None:
+        """Zero-width characters should not prevent keyword matches."""
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.HIGH,
+                    keywords=["kill"],
+                    message="violence",
+                ),
+            ],
+        )
+        evaluator = Evaluator(policies=[policy])
+        result = evaluator.evaluate("k\u200bill")
+        assert result.flagged
+        assert result.violation_count >= 1
+
+    def test_nfkc_normalization_matches_fullwidth(self) -> None:
+        """Fullwidth characters should be normalized and matched."""
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.HIGH,
+                    keywords=["kill"],
+                    message="violence",
+                ),
+            ],
+        )
+        evaluator = Evaluator(policies=[policy])
+        # Fullwidth 'ｋｉｌｌ' (U+FF4B U+FF49 U+FF4C U+FF4C)
+        result = evaluator.evaluate("\uff4b\uff49\uff4c\uff4c")
+        assert result.flagged
+
+    def test_normalization_preserves_original_in_preview(self) -> None:
+        """text_preview should contain the original (un-normalized) text."""
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.LOW,
+                    keywords=["hello"],
+                    message="m",
+                ),
+            ],
+        )
+        original = "h\u200bello"
+        evaluator = Evaluator(policies=[policy])
+        result = evaluator.evaluate(original)
+        assert result.text_preview == original
+
     def test_disabled_semantic_rule_no_api_call(self) -> None:
         from unittest.mock import MagicMock, patch
 

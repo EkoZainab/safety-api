@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import re
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -38,6 +40,11 @@ class AnthropicClientProtocol(Protocol):
     def messages(self) -> _MessagesAPI: ...
 
 
+_ZERO_WIDTH_RE = re.compile(
+    "[\u200b\u200c\u200d\u2060\ufeff\u180e\u00ad]"
+)
+
+
 class Evaluator:
     """Runs text against a collection of policies and produces scored results.
 
@@ -45,6 +52,16 @@ class Evaluator:
     that repeated evaluate() calls avoid redundant setup work.
     Semantic (API-based) rules run concurrently to minimize latency.
     """
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        """Normalize text to defeat trivial bypass techniques.
+
+        1. Strip zero-width characters (ZWSP, ZWNJ, ZWJ, WJ, BOM, MVS, soft hyphen).
+        2. Apply NFKC normalization (collapses homoglyphs / compatibility chars).
+        """
+        text = _ZERO_WIDTH_RE.sub("", text)
+        return unicodedata.normalize("NFKC", text)
 
     def __init__(
         self,
@@ -129,6 +146,10 @@ class Evaluator:
             incomplete_reasons.extend(self._build_warnings)
         rules_evaluated = 0
 
+        # Keep original text for preview; normalize for rule evaluation
+        original_text = text
+        text = self._normalize_text(text)
+
         deterministic: list[tuple[PolicyFile, BaseRule]] = []
         semantic: list[tuple[PolicyFile, BaseRule]] = []
 
@@ -205,7 +226,7 @@ class Evaluator:
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         result = EvaluationResult(
-            text_preview=text[:TEXT_PREVIEW_LENGTH],
+            text_preview=original_text[:TEXT_PREVIEW_LENGTH],
             policies_evaluated=len(self._policies),
             rules_evaluated=rules_evaluated,
             violations=violations,
