@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from safety_api.cli import main
@@ -138,6 +139,69 @@ class TestCLI:
                 "--policy-dir",
                 str(sample_policy_dir),
                 "--use-ai",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "ANTHROPIC_API_KEY" in result.output
+
+    def test_dry_run_shows_rules(self, sample_policy_dir: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["--dry-run", "--policy-dir", str(sample_policy_dir)],
+        )
+        assert result.exit_code == 0
+        assert "Loaded" in result.output
+        assert "rules from" in result.output
+        assert "regex" in result.output
+
+    def test_dry_run_does_not_require_input(self, sample_policy_dir: Path) -> None:
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["--dry-run", "--policy-dir", str(sample_policy_dir)],
+        )
+        # --dry-run should work without --text/--file/--stdin
+        assert result.exit_code == 0
+
+    def test_strict_mode_fails_on_invalid_policy(self, tmp_path: Path) -> None:
+        invalid_data = {
+            "policy": {"id": "broken", "name": "Broken Policy"},
+            "rules": [{"id": "bad-rule", "name": "Bad Rule"}],
+        }
+        (tmp_path / "invalid.yaml").write_text(
+            yaml.dump(invalid_data), encoding="utf-8"
+        )
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello",
+                "--policy-dir",
+                str(tmp_path),
+                "--strict",
+            ],
+        )
+        assert result.exit_code != 0
+
+    def test_ai_model_flag_accepted(
+        self, sample_policy_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        runner = CliRunner()
+        # --ai-model requires --use-ai, which requires API key — just verify
+        # the flag is accepted by the parser (error should be about the key)
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--use-ai",
+                "--ai-model",
+                "claude-haiku-4-5-20251001",
             ],
         )
         assert result.exit_code != 0

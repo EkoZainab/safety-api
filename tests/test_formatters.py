@@ -90,6 +90,19 @@ class TestTextFormatter:
         assert "pos 10-26" in output
 
 
+    def test_warnings_section_rendered(self) -> None:
+        result = _make_clean_result()
+        result.warnings = ["Rule 'x' skipped: bad config", "Something else"]
+        output = format_text(result)
+        assert "Warnings (2):" in output
+        assert "Rule 'x' skipped: bad config" in output
+        assert "Something else" in output
+
+    def test_no_warnings_section_when_empty(self) -> None:
+        output = format_text(_make_clean_result())
+        assert "Warnings" not in output
+
+
 class TestJsonFormatter:
     def test_valid_json_output(self) -> None:
         output = format_json(_make_clean_result())

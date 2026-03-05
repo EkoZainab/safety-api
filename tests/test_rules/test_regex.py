@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from safety_api.models import RuleConfig, RuleType, Severity
@@ -100,3 +102,22 @@ class TestRegexRule:
         config.pattern = ""  # set empty after construction
         with pytest.raises(ValueError, match="non-empty pattern"):
             RegexRule(config)
+
+    def test_redos_timeout_returns_empty(self) -> None:
+        """Verify that a regex exceeding the timeout returns empty results."""
+        config = RuleConfig(
+            id="redos",
+            name="ReDoS Pattern",
+            type=RuleType.REGEX,
+            severity=Severity.HIGH,
+            pattern=r"(a+)+b",
+            message="redos test",
+        )
+        rule = RegexRule(config)
+
+        # Patch the timeout to a tiny value so the test runs fast
+        with patch("safety_api.rules.regex._REGEX_EVAL_TIMEOUT", 0.001):
+            # Feed input known to cause catastrophic backtracking
+            evil_input = "a" * 30 + "c"
+            matches = rule.evaluate(evil_input)
+            assert matches == []
