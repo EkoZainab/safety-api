@@ -63,6 +63,7 @@ class RuleConfig(BaseModel):
 
     # Regex-specific fields
     pattern: str | None = None
+    validator: str | None = None
 
     # Semantic-specific fields (API-based evaluation)
     prompt: str | None = None

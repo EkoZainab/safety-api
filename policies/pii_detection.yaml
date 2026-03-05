@@ -40,10 +40,11 @@ rules:
 
   - id: pii-credit-card
     name: Credit Card Number Detection
-    description: Detects common credit card number patterns
+    description: Detects common credit card number patterns with Luhn validation
     type: regex
     severity: CRITICAL
     pattern: "\\b(?:\\d{4}[- ]?){3}\\d{1,4}\\b"
+    validator: luhn
     message: Possible credit card number detected
     enabled: true
     tags: [pii, financial]

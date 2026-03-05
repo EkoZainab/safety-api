@@ -103,6 +103,51 @@ class TestRegexRule:
         with pytest.raises(ValueError, match="non-empty pattern"):
             RegexRule(config)
 
+    def test_luhn_validator_filters_invalid_card(self) -> None:
+        config = RuleConfig(
+            id="cc",
+            name="Credit Card",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?:\d{4}[- ]?){3}\d{1,4}\b",
+            validator="luhn",
+            message="CC detected",
+        )
+        rule = RegexRule(config)
+        # 1234567890123456 fails Luhn — should be filtered out
+        matches = rule.evaluate("Order #1234567890123456")
+        assert matches == []
+
+    def test_luhn_validator_keeps_valid_card(self) -> None:
+        config = RuleConfig(
+            id="cc",
+            name="Credit Card",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?:\d{4}[- ]?){3}\d{1,4}\b",
+            validator="luhn",
+            message="CC detected",
+        )
+        rule = RegexRule(config)
+        # 4111111111111111 is a valid Visa test number
+        matches = rule.evaluate("Card: 4111111111111111")
+        assert len(matches) == 1
+        assert matches[0].matched_text == "4111111111111111"
+
+    def test_no_validator_keeps_all_matches(self) -> None:
+        config = RuleConfig(
+            id="cc",
+            name="Credit Card",
+            type=RuleType.REGEX,
+            severity=Severity.CRITICAL,
+            pattern=r"\b(?:\d{4}[- ]?){3}\d{1,4}\b",
+            message="CC detected",
+        )
+        rule = RegexRule(config)
+        # Without validator, any matching number is kept
+        matches = rule.evaluate("Order #1234567890123456")
+        assert len(matches) == 1
+
     def test_redos_timeout_raises(self) -> None:
         """Verify that a regex exceeding the timeout raises RegexTimeoutError."""
         config = RuleConfig(

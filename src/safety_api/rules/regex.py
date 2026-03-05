@@ -8,6 +8,7 @@ import threading
 
 from safety_api.models import Match, RuleConfig
 from safety_api.rules.base import BaseRule
+from safety_api.rules.validators import VALIDATOR_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,11 @@ class RegexRule(BaseRule):
             raise ValueError(
                 f"RegexRule '{config.id}' has invalid pattern: {e}"
             ) from e
+        self._validator = (
+            VALIDATOR_REGISTRY.get(config.validator)
+            if config.validator
+            else None
+        )
 
     def evaluate(self, text: str) -> list[Match]:
         result: list[Match] = []
@@ -57,5 +63,8 @@ class RegexRule(BaseRule):
                 f"Regex evaluation timed out after {_REGEX_EVAL_TIMEOUT}s "
                 f"for rule '{self.rule_id}' — pattern may be vulnerable to ReDoS"
             )
+
+        if self._validator:
+            result = [m for m in result if self._validator(m.matched_text)]
 
         return result
