@@ -1,0 +1,54 @@
+policy:
+  id: sexual-content
+  name: Sexual Content Detection
+  description: >
+    Detects sexually explicit content, solicitation, and
+    child exploitation references.
+  version: "1.0.0"
+  enabled: true
+
+rules:
+  - id: sexual-explicit-terms
+    name: Explicit Sexual Terms
+    description: Detects explicit sexual terminology
+    type: keyword
+    severity: CRITICAL
+    keywords:
+      - "hardcore porn"
+      - "child porn"
+      - "revenge porn"
+      - "deepfake porn"
+      - "sexual intercourse"
+      - "sexually explicit"
+    case_sensitive: false
+    match_whole_word: true
+    message: Explicit sexual content detected
+    enabled: true
+    tags: [sexual, explicit]
+
+  - id: sexual-solicitation
+    name: Sexual Solicitation
+    description: Detects solicitation phrases requesting explicit content
+    type: regex
+    severity: HIGH
+    pattern: "(?i)send\\s+(me\\s+)?(nudes|nude\\s+pics|nude\\s+photos|explicit\\s+photos|dick\\s+pics)"
+    message: Sexual solicitation detected
+    enabled: true
+    tags: [sexual, solicitation]
+
+  - id: csam-references
+    name: CSAM References
+    description: Detects references to child sexual abuse material
+    type: keyword
+    severity: CRITICAL
+    keywords:
+      - "child pornography"
+      - "child exploitation material"
+      - "csam"
+      - "underage porn"
+      - "minor porn"
+    case_sensitive: false
+    match_whole_word: true
+    message: Child exploitation reference detected
+    enabled: true
+    tags: [sexual, csam, critical]
