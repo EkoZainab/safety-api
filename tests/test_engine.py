@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from safety_api.engine import Evaluator
-from safety_api.models import PolicyFile, Severity
+from safety_api.models import Match, PolicyFile, Severity, Violation
 
 
 class TestEvaluator:
@@ -468,6 +468,125 @@ class TestEvaluator:
         evaluator = Evaluator(policies=[policy])
         result = evaluator.evaluate(original)
         assert result.text_preview == original
+
+    # ------------------------------------------------------------------
+    # Deduplication tests
+    # ------------------------------------------------------------------
+
+    def test_dedup_overlapping_higher_severity_kept(self) -> None:
+        high = Violation(
+            rule_id="r1", rule_name="R1", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m",
+            matches=[Match(start=0, end=10, matched_text="overlap")],
+        )
+        low = Violation(
+            rule_id="r2", rule_name="R2", policy_id="p", policy_name="P",
+            severity=Severity.LOW, message="m",
+            matches=[Match(start=5, end=15, matched_text="overlap")],
+        )
+        result = Evaluator._deduplicate_violations([low, high])
+        assert len(result) == 1
+        assert result[0].rule_id == "r1"
+
+    def test_dedup_non_overlapping_both_kept(self) -> None:
+        v1 = Violation(
+            rule_id="r1", rule_name="R1", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m",
+            matches=[Match(start=0, end=5, matched_text="a")],
+        )
+        v2 = Violation(
+            rule_id="r2", rule_name="R2", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m",
+            matches=[Match(start=10, end=15, matched_text="b")],
+        )
+        result = Evaluator._deduplicate_violations([v1, v2])
+        assert len(result) == 2
+
+    def test_dedup_tiebreak_confidence(self) -> None:
+        high_conf = Violation(
+            rule_id="r1", rule_name="R1", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m", confidence=0.95,
+            matches=[Match(start=0, end=10, matched_text="a")],
+        )
+        low_conf = Violation(
+            rule_id="r2", rule_name="R2", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m", confidence=0.5,
+            matches=[Match(start=0, end=10, matched_text="a")],
+        )
+        result = Evaluator._deduplicate_violations([low_conf, high_conf])
+        assert len(result) == 1
+        assert result[0].rule_id == "r1"
+
+    def test_dedup_tiebreak_source(self) -> None:
+        rule_v = Violation(
+            rule_id="r1", rule_name="R1", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m", confidence=0.9, source="rule",
+            matches=[Match(start=0, end=10, matched_text="a")],
+        )
+        ai_v = Violation(
+            rule_id="r2", rule_name="R2", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m", confidence=0.9, source="ai",
+            matches=[Match(start=0, end=10, matched_text="a")],
+        )
+        result = Evaluator._deduplicate_violations([ai_v, rule_v])
+        assert len(result) == 1
+        assert result[0].source == "rule"
+
+    def test_dedup_matchless_always_kept(self) -> None:
+        with_match = Violation(
+            rule_id="r1", rule_name="R1", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m",
+            matches=[Match(start=0, end=10, matched_text="a")],
+        )
+        matchless = Violation(
+            rule_id="r2", rule_name="R2", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m", matches=[],
+        )
+        result = Evaluator._deduplicate_violations([with_match, matchless])
+        assert len(result) == 2
+
+    def test_dedup_empty_list(self) -> None:
+        assert Evaluator._deduplicate_violations([]) == []
+
+    def test_dedup_single_violation(self) -> None:
+        v = Violation(
+            rule_id="r1", rule_name="R1", policy_id="p", policy_name="P",
+            severity=Severity.HIGH, message="m",
+            matches=[Match(start=0, end=5, matched_text="a")],
+        )
+        result = Evaluator._deduplicate_violations([v])
+        assert len(result) == 1
+
+    def test_dedup_integration_overlapping_rules(self) -> None:
+        """Two rules matching overlapping spans → only higher severity survives."""
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="broad",
+                    name="Broad",
+                    type=RuleType.REGEX,
+                    severity=Severity.LOW,
+                    pattern=r"\d{3}-\d{2}-\d{4}",
+                    message="digits",
+                ),
+                RuleConfig(
+                    id="ssn",
+                    name="SSN",
+                    type=RuleType.REGEX,
+                    severity=Severity.CRITICAL,
+                    pattern=r"\b\d{3}-\d{2}-\d{4}\b",
+                    message="SSN",
+                ),
+            ],
+        )
+        evaluator = Evaluator(policies=[policy])
+        result = evaluator.evaluate("My SSN is 123-45-6789.")
+        # Both rules match the same span; only the CRITICAL one should survive
+        assert result.violation_count == 1
+        assert result.violations[0].severity == Severity.CRITICAL
 
     def test_disabled_semantic_rule_no_api_call(self) -> None:
         from unittest.mock import MagicMock, patch

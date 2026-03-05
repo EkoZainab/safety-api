@@ -111,6 +111,50 @@ class Evaluator:
         return instances
 
     @staticmethod
+    def _deduplicate_violations(
+        violations: list[Violation],
+    ) -> list[Violation]:
+        """Remove violations whose match spans overlap with higher-priority ones.
+
+        Priority: severity weight desc → confidence desc → source "rule" > "ai".
+        Violations without matches (e.g. AI full-text flags) are always kept.
+        """
+        with_matches: list[Violation] = []
+        without_matches: list[Violation] = []
+        for v in violations:
+            if v.matches and any(m.start != m.end for m in v.matches):
+                with_matches.append(v)
+            else:
+                without_matches.append(v)
+
+        source_priority = {"rule": 0, "ai": 1}
+        with_matches.sort(
+            key=lambda v: (
+                -v.severity.weight,
+                -v.confidence,
+                source_priority.get(v.source, 2),
+            )
+        )
+
+        kept: list[Violation] = []
+        used_spans: list[tuple[int, int]] = []
+        for v in with_matches:
+            dominated = False
+            for m in v.matches:
+                for start_b, end_b in used_spans:
+                    if m.start < end_b and start_b < m.end:
+                        dominated = True
+                        break
+                if dominated:
+                    break
+            if not dominated:
+                kept.append(v)
+                for m in v.matches:
+                    used_spans.append((m.start, m.end))
+
+        return kept + without_matches
+
+    @staticmethod
     def _make_violation(
         policy_file: PolicyFile,
         rule: BaseRule,
@@ -229,6 +273,9 @@ class Evaluator:
                 v for v in violations
                 if v.severity.weight >= threshold_weight
             ]
+
+        # Deduplicate overlapping violations
+        violations = self._deduplicate_violations(violations)
 
         elapsed_ms = (time.perf_counter() - start) * 1000
 
