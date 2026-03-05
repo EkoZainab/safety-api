@@ -101,7 +101,9 @@ def evaluate_with_ai(
                     "role": "user",
                     "content": (
                         "Evaluate this text:\n\n"
-                        f"<text_to_evaluate>\n{text}\n</text_to_evaluate>"
+                        "<text_to_evaluate>\n"
+                        f"{text.replace('</text_to_evaluate>', '&lt;/text_to_evaluate&gt;')}"
+                        "\n</text_to_evaluate>"
                     ),
                 }
             ],

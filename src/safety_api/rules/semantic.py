@@ -81,9 +81,10 @@ class SemanticRule(BaseRule):
             "\"text\": str}]}\n"
             "If no violation is found, set flagged=false and spans to an empty list."
         )
+        sanitized_text = text.replace("</text_to_evaluate>", "&lt;/text_to_evaluate&gt;")
         user_msg = (
             f"{evaluation_prompt}\n\n"
-            f"<text_to_evaluate>\n{text}\n</text_to_evaluate>"
+            f"<text_to_evaluate>\n{sanitized_text}\n</text_to_evaluate>"
         )
 
         try:
