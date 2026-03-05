@@ -1,0 +1,58 @@
+policy:
+  id: profanity
+  name: Profanity Detection
+  description: >
+    Detects strong profanity, offensive slurs, and masked profanity
+    in text content.
+  version: "1.0.0"
+  enabled: true
+
+rules:
+  - id: profanity-strong
+    name: Strong Profanity
+    description: Detects common strong profanity terms
+    type: keyword
+    severity: MEDIUM
+    keywords:
+      - "fuck"
+      - "shit"
+      - "asshole"
+      - "motherfucker"
+      - "bullshit"
+      - "goddamn"
+      - "bitch"
+    case_sensitive: false
+    match_whole_word: true
+    message: Strong profanity detected
+    enabled: true
+    tags: [profanity, strong]
+
+  - id: profanity-slurs
+    name: Offensive Slurs
+    description: Detects offensive slurs and derogatory terms
+    type: keyword
+    severity: HIGH
+    keywords:
+      - "nigger"
+      - "faggot"
+      - "retard"
+      - "spic"
+      - "kike"
+      - "chink"
+      - "wetback"
+      - "tranny"
+    case_sensitive: false
+    match_whole_word: true
+    message: Offensive slur detected
+    enabled: true
+    tags: [profanity, slur]
+
+  - id: profanity-masked
+    name: Masked Profanity
+    description: Detects masked or censored profanity patterns
+    type: regex
+    severity: LOW
+    pattern: "(?i)\\b(f[\\*\\#\\@]+k|s[\\*\\#\\@]+t|a[\\*\\#\\@]+e|b[\\*\\#\\@]+h|d[\\*\\#\\@]+k)\\b"
+    message: Masked profanity detected
+    enabled: true
+    tags: [profanity, masked]
