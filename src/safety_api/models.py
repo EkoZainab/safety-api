@@ -5,7 +5,7 @@ from __future__ import annotations
 import enum
 import types
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field, field_validator
 
@@ -128,7 +128,7 @@ class Violation(BaseModel):
     message: str
     matches: list[Match] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
-    source: str = "rule"  # "rule" for deterministic, "ai" for API-based
+    source: Literal["rule", "ai"] = "rule"
     confidence: float = 1.0  # 1.0 for deterministic rules, 0.0-1.0 for AI
 
 
