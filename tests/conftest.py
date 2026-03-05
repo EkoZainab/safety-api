@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,15 @@ from safety_api.models import (
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def _clear_audit_logger() -> None:  # type: ignore[misc]
+    """Remove all handlers from the audit logger between tests."""
+    audit = logging.getLogger("safety_api.audit")
+    audit.handlers.clear()
+    yield  # type: ignore[misc]
+    audit.handlers.clear()
 
 
 # ---------------------------------------------------------------------------

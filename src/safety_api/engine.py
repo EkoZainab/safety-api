@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import concurrent.futures
+import hashlib
+import json
 import logging
 import re
 import time
@@ -27,6 +29,7 @@ from safety_api.rules import create_rule
 from safety_api.rules.base import BaseRule
 
 logger = logging.getLogger(__name__)
+audit_logger = logging.getLogger("safety_api.audit")
 
 
 class _MessagesAPI(Protocol):
@@ -290,6 +293,25 @@ class Evaluator:
             incomplete_reasons=incomplete_reasons,
         )
         result.compute_score()
+
+        if audit_logger.handlers:
+            audit_logger.info(
+                json.dumps(
+                    {
+                        "timestamp": result.timestamp.isoformat(),
+                        "text_length": len(text),
+                        "text_hash": hashlib.sha256(text.encode()).hexdigest(),
+                        "policies_evaluated": result.policies_evaluated,
+                        "rules_evaluated": result.rules_evaluated,
+                        "violation_count": result.violation_count,
+                        "total_score": result.total_score,
+                        "flagged": result.flagged,
+                        "incomplete": result.incomplete,
+                        "evaluation_time_ms": result.evaluation_time_ms,
+                    }
+                )
+            )
+
         return result
 
     def summarize_rules(self) -> dict[str, int]:

@@ -154,6 +154,12 @@ def _get_anthropic_client() -> Any:
     help="Show loaded rules and exit without evaluating.",
 )
 @click.option(
+    "--audit-log",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to a JSONL file for audit logging.",
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -175,6 +181,7 @@ def main(
     redact: bool,
     strict: bool,
     dry_run: bool,
+    audit_log: Path | None,
     verbose: bool,
 ) -> None:
     """Evaluate text against configurable content safety policies.
@@ -191,6 +198,14 @@ def main(
         level=logging.DEBUG if verbose else logging.WARNING,
         format="%(levelname)s: %(message)s",
     )
+
+    if audit_log:
+        _audit = logging.getLogger("safety_api.audit")
+        _handler = logging.FileHandler(audit_log, encoding="utf-8")
+        _handler.setFormatter(logging.Formatter("%(message)s"))
+        _audit.addHandler(_handler)
+        _audit.setLevel(logging.INFO)
+        _audit.propagate = False
 
     # Resolve policy directory
     resolved_policy_dir = policy_dir or DEFAULT_POLICY_DIR

@@ -347,3 +347,66 @@ class TestCLI:
         )
         assert result.exit_code != 0
         assert "ANTHROPIC_API_KEY" in result.output
+
+    def test_audit_log_creates_jsonl(
+        self, sample_policy_dir: Path, tmp_path: Path
+    ) -> None:
+        audit_file = tmp_path / "audit.jsonl"
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Email me at test@example.com",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--audit-log",
+                str(audit_file),
+            ],
+        )
+        assert result.exit_code == 1
+        assert audit_file.exists()
+        lines = audit_file.read_text().strip().splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["flagged"] is True
+        assert "text_hash" in record
+        assert "timestamp" in record
+
+    def test_no_audit_log_without_flag(
+        self, sample_policy_dir: Path, tmp_path: Path
+    ) -> None:
+        audit_file = tmp_path / "audit.jsonl"
+        runner = CliRunner()
+        runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello world",
+                "--policy-dir",
+                str(sample_policy_dir),
+            ],
+        )
+        assert not audit_file.exists()
+
+    def test_audit_log_clean_text(
+        self, sample_policy_dir: Path, tmp_path: Path
+    ) -> None:
+        audit_file = tmp_path / "audit.jsonl"
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "--text",
+                "Hello world",
+                "--policy-dir",
+                str(sample_policy_dir),
+                "--audit-log",
+                str(audit_file),
+            ],
+        )
+        assert result.exit_code == 0
+        lines = audit_file.read_text().strip().splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["flagged"] is False

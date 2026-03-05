@@ -618,3 +618,67 @@ class TestEvaluator:
 
         mock_client.messages.create.assert_not_called()
         assert result.rules_evaluated == 0
+
+    # ------------------------------------------------------------------
+    # Audit logging tests
+    # ------------------------------------------------------------------
+
+    def test_audit_log_emitted_with_handler(
+        self, pii_policy: PolicyFile
+    ) -> None:
+        import json
+        import logging
+        import logging.handlers
+
+        audit = logging.getLogger("safety_api.audit")
+        handler = logging.handlers.MemoryHandler(capacity=100)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        audit.addHandler(handler)
+        audit.setLevel(logging.INFO)
+
+        evaluator = Evaluator(policies=[pii_policy])
+        evaluator.evaluate("test@example.com")
+
+        handler.flush()
+        assert len(handler.buffer) == 1
+        record = json.loads(handler.buffer[0].getMessage())
+        assert "text_hash" in record
+        assert "timestamp" in record
+        assert record["flagged"] is True
+        assert record["violation_count"] >= 1
+        assert "text_preview" not in record
+
+    def test_audit_log_not_emitted_without_handler(
+        self, pii_policy: PolicyFile
+    ) -> None:
+        import logging
+
+        audit = logging.getLogger("safety_api.audit")
+        assert len(audit.handlers) == 0
+
+        evaluator = Evaluator(policies=[pii_policy])
+        evaluator.evaluate("test@example.com")
+        # No handler means no output — nothing to assert except no crash
+
+    def test_audit_log_excludes_input_text(
+        self, pii_policy: PolicyFile
+    ) -> None:
+        import json
+        import logging
+        import logging.handlers
+
+        audit = logging.getLogger("safety_api.audit")
+        handler = logging.handlers.MemoryHandler(capacity=100)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        audit.addHandler(handler)
+        audit.setLevel(logging.INFO)
+
+        secret = "super-secret-test@example.com"
+        evaluator = Evaluator(policies=[pii_policy])
+        evaluator.evaluate(secret)
+
+        handler.flush()
+        raw = handler.buffer[0].getMessage()
+        assert secret not in raw
+        record = json.loads(raw)
+        assert all(secret not in str(v) for v in record.values())
