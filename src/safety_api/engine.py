@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from safety_api.anthropic_eval import evaluate_with_ai
-from safety_api.loader import load_policies
+from safety_api.loader import load_policies, load_policies_with_errors
 from safety_api.models import (
     DEFAULT_AI_MODEL,
     TEXT_PREVIEW_LENGTH,
@@ -52,11 +52,13 @@ class Evaluator:
         anthropic_client: AnthropicClientProtocol | None = None,
         ai_model: str = DEFAULT_AI_MODEL,
         severity_threshold: Severity | None = None,
+        load_errors: list[str] | None = None,
     ) -> None:
         self._policies = policies
         self._anthropic_client = anthropic_client
         self._ai_model = ai_model
         self._severity_threshold = severity_threshold
+        self._load_errors: list[str] = load_errors or []
         self._build_warnings: list[str] = []
         self._rule_instances = self._build_rules()
 
@@ -122,6 +124,9 @@ class Evaluator:
         start = time.perf_counter()
         violations: list[Violation] = []
         eval_warnings: list[str] = list(self._build_warnings)
+        incomplete_reasons: list[str] = list(self._load_errors)
+        if self._build_warnings:
+            incomplete_reasons.extend(self._build_warnings)
         rules_evaluated = 0
 
         deterministic: list[tuple[PolicyFile, BaseRule]] = []
@@ -141,9 +146,9 @@ class Evaluator:
                 logger.exception(
                     "Rule '%s' failed during evaluation", rule.config.id
                 )
-                eval_warnings.append(
-                    f"Rule '{rule.config.id}' failed: {exc}"
-                )
+                msg = f"Rule '{rule.config.id}' failed: {exc}"
+                eval_warnings.append(msg)
+                incomplete_reasons.append(msg)
                 continue
             rules_evaluated += 1
             if matches:
@@ -166,9 +171,9 @@ class Evaluator:
                             "Rule '%s' failed during evaluation",
                             rule.config.id,
                         )
-                        eval_warnings.append(
-                            f"Rule '{rule.config.id}' failed: {exc}"
-                        )
+                        msg = f"Rule '{rule.config.id}' failed: {exc}"
+                        eval_warnings.append(msg)
+                        incomplete_reasons.append(msg)
                         continue
                     rules_evaluated += 1
                     if matches:
@@ -185,7 +190,9 @@ class Evaluator:
                 violations.extend(ai_violations)
             except Exception as exc:
                 logger.exception("Holistic AI evaluation failed")
-                eval_warnings.append(f"Holistic AI evaluation failed: {exc}")
+                msg = f"Holistic AI evaluation failed: {exc}"
+                eval_warnings.append(msg)
+                incomplete_reasons.append(msg)
 
         # Apply severity threshold filter
         if self._severity_threshold is not None:
@@ -204,6 +211,8 @@ class Evaluator:
             violations=violations,
             evaluation_time_ms=round(elapsed_ms, 2),
             warnings=eval_warnings,
+            incomplete=bool(incomplete_reasons),
+            incomplete_reasons=incomplete_reasons,
         )
         result.compute_score()
         return result
@@ -234,5 +243,9 @@ class Evaluator:
         Returns:
             A configured Evaluator instance.
         """
-        policies = load_policies(policy_dir, strict=strict)
-        return cls(policies=policies, **kwargs)
+        load_result = load_policies_with_errors(policy_dir, strict=strict)
+        return cls(
+            policies=load_result.policies,
+            load_errors=load_result.errors,
+            **kwargs,
+        )

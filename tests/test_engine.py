@@ -258,6 +258,148 @@ class TestEvaluator:
             result = evaluator.evaluate("some text")
             assert any("Holistic AI evaluation failed" in w for w in result.warnings)
 
+    def test_rule_build_failure_marks_incomplete(self) -> None:
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="bad-regex",
+                    name="Bad Regex",
+                    type=RuleType.REGEX,
+                    severity=Severity.HIGH,
+                    pattern=r"(?P<bad",  # invalid
+                    message="broken",
+                ),
+            ],
+        )
+        evaluator = Evaluator(policies=[policy])
+        result = evaluator.evaluate("some text")
+        assert result.incomplete is True
+        assert any("bad-regex" in r for r in result.incomplete_reasons)
+
+    def test_rule_eval_failure_marks_incomplete(self) -> None:
+        from unittest.mock import MagicMock
+
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="email",
+                    name="Email",
+                    type=RuleType.REGEX,
+                    severity=Severity.HIGH,
+                    pattern=r"\d+",
+                    message="test",
+                ),
+            ],
+        )
+        evaluator = Evaluator(policies=[policy])
+
+        # Force the rule to fail during evaluation
+        evaluator._rule_instances[0][1].evaluate = MagicMock(
+            side_effect=RuntimeError("boom")
+        )
+        result = evaluator.evaluate("123")
+        assert result.incomplete is True
+        assert any("email" in r and "boom" in r for r in result.incomplete_reasons)
+
+    def test_holistic_ai_failure_marks_incomplete(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.LOW,
+                    keywords=["test"],
+                    message="match",
+                ),
+            ],
+        )
+        mock_client = MagicMock()
+        with patch(
+            "safety_api.engine.evaluate_with_ai",
+            side_effect=RuntimeError("API down"),
+        ):
+            evaluator = Evaluator(
+                policies=[policy], anthropic_client=mock_client
+            )
+            result = evaluator.evaluate("some text")
+            assert result.incomplete is True
+            assert any(
+                "Holistic AI evaluation failed" in r
+                for r in result.incomplete_reasons
+            )
+
+    def test_load_errors_marks_incomplete(self) -> None:
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="kw",
+                    name="KW",
+                    type=RuleType.KEYWORD,
+                    severity=Severity.LOW,
+                    keywords=["test"],
+                    message="match",
+                ),
+            ],
+        )
+        evaluator = Evaluator(
+            policies=[policy],
+            load_errors=["Failed to load policy from bad.yaml: invalid"],
+        )
+        result = evaluator.evaluate("hello")
+        assert result.incomplete is True
+        assert any("bad.yaml" in r for r in result.incomplete_reasons)
+
+    def test_clean_complete_evaluation(
+        self, pii_policy: PolicyFile, clean_text: str
+    ) -> None:
+        evaluator = Evaluator(policies=[pii_policy])
+        result = evaluator.evaluate(clean_text)
+        assert not result.flagged
+        assert not result.incomplete
+        assert result.incomplete_reasons == []
+
+    def test_empty_policy_dir_marks_incomplete(self, tmp_path: Path) -> None:
+        evaluator = Evaluator.from_policy_dir(tmp_path)
+        result = evaluator.evaluate("some text")
+        assert result.incomplete is True
+        assert any("No YAML policy files found" in r for r in result.incomplete_reasons)
+
+    def test_semantic_without_client_not_incomplete(self) -> None:
+        """Semantic rules without a client is intentional config, not incomplete."""
+        from safety_api.models import PolicyConfig, RuleConfig, RuleType
+
+        policy = PolicyFile(
+            policy=PolicyConfig(id="p", name="P"),
+            rules=[
+                RuleConfig(
+                    id="sem",
+                    name="Semantic",
+                    type=RuleType.SEMANTIC,
+                    severity=Severity.HIGH,
+                    prompt="Analyze this text.",
+                    message="violation",
+                ),
+            ],
+        )
+        evaluator = Evaluator(policies=[policy])  # no client
+        result = evaluator.evaluate("some text")
+        assert not result.incomplete
+
     def test_disabled_semantic_rule_no_api_call(self) -> None:
         from unittest.mock import MagicMock, patch
 
